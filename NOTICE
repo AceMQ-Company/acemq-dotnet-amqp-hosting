@@ -1,0 +1,27 @@
+AceMQ Hosting for .NET
+Copyright 2026 AceMQ
+
+This product includes software developed at AceMQ (https://acemq.com).
+
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+---
+
+.NET, ASP.NET Core and the Microsoft.Extensions packages are trademarks or products
+of Microsoft Corporation. This project is an independent integration package for the
+AceMQ AMQP library. It is not part of .NET, and is not affiliated with, endorsed by,
+or sponsored by Microsoft.
+
+OpenTelemetry is a trademark of The Linux Foundation. AceMq.Amqp.Hosting.OpenTelemetry
+is an instrumentation registration package for the AceMQ AMQP library and is not part
+of the OpenTelemetry project.
+
+RabbitMQ is a trademark of Broadcom Inc. and/or its subsidiaries. References to
+RabbitMQ describe compatibility only.
+
+AceMq.Amqp is depended on as a published package rather than built here, so this
+repository proves that the released package works from an application rather than
+that its source does.
+
+This product depends on software developed by third parties, each under its own
+licence. The dependencies of a given package are listed in its nuspec.

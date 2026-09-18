@@ -1,0 +1,60 @@
+# Build the documentation site and publish it to GitHub Pages.
+#
+# The site is the markdown under docs/ rendered to HTML. There is no generated
+# API reference here, unlike acemq-dotnet-amqp: the public surface of this package
+# is small enough to be described in prose, and the library's reference is
+# published from the library's own repository.
+name: docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+      - '.github/scripts/build-docs-site.sh'
+  workflow_dispatch:
+
+# One deployment at a time; a queued run supersedes a waiting one rather than
+# racing it. In-progress runs are allowed to finish so a half-published site is
+# never left behind.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+# Least privilege for every job that does not ask for more. Jobs needing more
+# declare it themselves.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pandoc
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends pandoc
+
+      - name: Render the pages
+        run: bash .github/scripts/build-docs-site.sh
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    # A job's own block replaces the workflow default rather than adding to it,
+    # so contents is repeated here. This is GitHub's own deploy-pages triple.
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

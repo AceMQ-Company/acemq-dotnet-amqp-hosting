@@ -1,0 +1,68 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!--
+      The same two targets acemq-dotnet-amqp ships. netstandard2.0 survives here
+      because every Microsoft.Extensions package this needs still carries a
+      netstandard2.0 asset on the 8.0 line: Hosting.Abstractions (where
+      BackgroundService lives), DependencyInjection.Abstractions, Options,
+      Options.ConfigurationExtensions, Logging.Abstractions and
+      Diagnostics.HealthChecks.Abstractions. CI checks the built assembly rather
+      than trusting this line.
+    -->
+    <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <PackageId>AceMq.Amqp.Hosting</PackageId>
+    <Description>Dependency injection and hosted-service integration for AceMQ AMQP: AddAceMq, typed message handlers resolved from the container, a consumer host that drains on shutdown, and an IHealthCheck.</Description>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      The released package, from https://acemq.org/nuget/index.json, not a project
+      reference. This repository exists partly to prove the published package is
+      usable from an application, and a project reference would prove only that the
+      source is.
+    -->
+    <PackageReference Include="AceMq.Amqp" Version="$(AceMqVersion)" />
+    <!--
+      The RabbitMQ transport ships with this package deliberately. Transports are
+      registered by hand in acemq-dotnet-amqp — there is no assembly scanning — so a
+      package that configures a connection from a URL and does not carry a transport
+      would fail at the first amqp:// with "no transport registered for scheme".
+      That is the one thing an integration package must not leave to the reader.
+    -->
+    <PackageReference Include="AceMq.Amqp.RabbitMq" Version="$(AceMqVersion)" />
+
+    <!--
+      The whole Hosting package, not only its abstractions, for one type: HostOptions,
+      which carries the host's own ShutdownTimeout and lives in the concrete assembly.
+      Reading it is what lets the consumer host warn at startup that the drain it was
+      configured for is longer than the host will wait — the trap that makes a carefully
+      set drain timeout silently do nothing. A package that integrates with the generic
+      host referencing the generic host is not a surprising dependency.
+    -->
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="$(ExtensionsVersion)" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="$(ExtensionsVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="$(ExtensionsVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="$(ExtensionsVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="$(ExtensionsVersion)" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <!-- Nullable annotations and IsExternalInit are not in netstandard2.0. -->
+    <PackageReference Include="Nullable" Version="1.3.1" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>AceMq.Amqp.Hosting.Tests</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>AceMq.Amqp.Hosting.IntegrationTests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+</Project>

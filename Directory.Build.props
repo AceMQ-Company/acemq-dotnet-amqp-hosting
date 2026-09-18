@@ -1,0 +1,54 @@
+<Project>
+
+  <!--
+    Shared version and package metadata for every project in the repository.
+
+    This repository is on its own version line, starting at 0.1.0, and the library
+    it integrates is on another. The reason is the same one the Spring Boot starter
+    gives: this package tracks two release trains at once. A change in
+    Microsoft.Extensions.Hosting is as likely to force a release here as a change in
+    AceMQ is, and a shared version number would have to mean "one of the two moved",
+    which tells a consumer nothing about which.
+
+    So: AceMq.Amqp is a dependency with a version range, not a sibling.
+  -->
+  <PropertyGroup>
+    <Version>0.1.0</Version>
+
+    <!-- The released AceMQ for .NET this is built and tested against. -->
+    <AceMqVersion>0.6.0</AceMqVersion>
+
+    <!--
+      Microsoft.Extensions on the 8.0 line, not the newest. 8.0 is the last line
+      whose abstractions still carry a netstandard2.0 asset, and netstandard2.0 is
+      the reach promise acemq-dotnet-amqp makes. A consumer on a newer line gets the
+      newer assemblies anyway — NuGet resolves to the highest version in the graph —
+      so pinning low here costs nothing and buys .NET Framework.
+    -->
+    <ExtensionsVersion>8.0.0</ExtensionsVersion>
+
+    <Authors>AceMQ</Authors>
+    <Company>AceMQ</Company>
+    <Product>AceMQ for .NET</Product>
+    <Copyright>Copyright 2026 AceMQ</Copyright>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageProjectUrl>https://acemq.org/acemq-dotnet-amqp-hosting/</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/AceMQ-Company/acemq-dotnet-amqp-hosting</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>amqp;rabbitmq;messaging;queue;dependency-injection;hosting;aspnetcore</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <DebugType>portable</DebugType>
+  </PropertyGroup>
+
+  <!-- The readme shown on the package page has to be inside the package. -->
+  <ItemGroup Condition="'$(IsPackable)' != 'false'">
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="/" Visible="false" />
+    <None Include="$(MSBuildThisFileDirectory)LICENSE" Pack="true" PackagePath="/" Visible="false" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>Worker</RootNamespace>
+    <!--
+      Built for net8.0 because that is the lower of the library's two targets and the one
+      worth proving an application can use. Rolled forward so it also runs on a machine
+      that has only a newer runtime, which is the usual case on a developer's laptop.
+    -->
+    <RollForward>LatestMajor</RollForward>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/AceMq.Amqp.Hosting/AceMq.Amqp.Hosting.csproj" />
+    <ProjectReference Include="../../src/AceMq.Amqp.Hosting.OpenTelemetry/AceMq.Amqp.Hosting.OpenTelemetry.csproj" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.15.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

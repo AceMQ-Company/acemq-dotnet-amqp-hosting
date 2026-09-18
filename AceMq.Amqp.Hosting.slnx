@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AceMq.Amqp.Hosting/AceMq.Amqp.Hosting.csproj" />
+    <Project Path="src/AceMq.Amqp.Hosting.OpenTelemetry/AceMq.Amqp.Hosting.OpenTelemetry.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AceMq.Amqp.Hosting.Tests/AceMq.Amqp.Hosting.Tests.csproj" />
+    <Project Path="tests/AceMq.Amqp.Hosting.IntegrationTests/AceMq.Amqp.Hosting.IntegrationTests.csproj" />
+  </Folder>
+  <Folder Name="/examples/">
+    <Project Path="examples/worker/worker.csproj" />
+  </Folder>
+</Solution>

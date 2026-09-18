@@ -1,0 +1,183 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+
+jobs:
+  build:
+    # Build, unit tests, and the two guards that keep the promises this package makes:
+    # that it still reaches netstandard2.0, and that both targets are in the package
+    # rather than only in bin.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          # 8.0.x as well as 10.0.x. The 10 SDK can build net8.0 by downloading the
+          # targeting pack from NuGet, which works until the day it does not; installing
+          # the SDK that carries it makes the build depend on the runner rather than on a
+          # fetch. 8.0.x also brings the runtime the example is built for.
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Restore
+        # The AceMQ feed is in NuGet.config, and the package it serves is the released
+        # one. A restore that resolved AceMq.Amqp from anywhere else would make the rest
+        # of this job prove nothing about the published package.
+        run: dotnet restore AceMq.Amqp.Hosting.slnx
+
+      - name: Build
+        run: dotnet build AceMq.Amqp.Hosting.slnx --configuration Release --no-restore
+
+      - name: Unit tests
+        # Over the library's in-memory transport, so no broker and no flake. The drain is
+        # covered here as well as in the integration job: this is the copy that runs on
+        # every push in under two seconds.
+        run: >
+          dotnet test tests/AceMq.Amqp.Hosting.Tests/AceMq.Amqp.Hosting.Tests.csproj
+          --configuration Release --no-build --verbosity normal
+
+      - name: Verify both packages still build for netstandard2.0
+        # The reach promise acemq-dotnet-amqp makes, kept here or not kept at all. It is
+        # checked against the built assembly rather than the project file: a
+        # <TargetFrameworks> line can say netstandard2.0 and still fail to produce one,
+        # and a dependency that quietly drops the asset is exactly how that happens.
+        run: |
+          for p in AceMq.Amqp.Hosting AceMq.Amqp.Hosting.OpenTelemetry; do
+            test -f "src/$p/bin/Release/netstandard2.0/$p.dll" \
+              || { echo "::error::$p no longer builds for netstandard2.0"; exit 1; }
+            echo "netstandard2.0 confirmed: $p"
+          done
+
+      - name: Verify both packages ship both targets
+        # Multi-targeting is only real if it reaches the package. A project that builds
+        # netstandard2.0 into bin and ships one lib folder is a promise the consumer
+        # never sees.
+        run: |
+          dotnet pack AceMq.Amqp.Hosting.slnx --configuration Release --no-build \
+            -o "$RUNNER_TEMP/packages"
+          for p in AceMq.Amqp.Hosting AceMq.Amqp.Hosting.OpenTelemetry; do
+            # The [0-9] anchors on the version, so AceMq.Amqp.Hosting does not match
+            # AceMq.Amqp.Hosting.OpenTelemetry and check the wrong package.
+            nupkg=$(find "$RUNNER_TEMP/packages" -name "$p.[0-9]*.nupkg" | head -1)
+            test -n "$nupkg" || { echo "::error::$p produced no package"; exit 1; }
+            for tfm in netstandard2.0 net8.0; do
+              unzip -l "$nupkg" | grep -q "lib/$tfm/$p.dll" \
+                || { echo "::error::$p ships no lib/$tfm"; exit 1; }
+            done
+            echo "both targets confirmed: $p"
+          done
+
+      - name: Verify the package depends on the released AceMq.Amqp
+        # A project reference slipped in where a package reference belongs would make the
+        # whole repository stop proving what it exists to prove: that the published
+        # AceMq.Amqp is usable from an application.
+        run: |
+          nupkg=$(find "$RUNNER_TEMP/packages" -name "AceMq.Amqp.Hosting.[0-9]*.nupkg" | head -1)
+          unzip -p "$nupkg" AceMq.Amqp.Hosting.nuspec | grep -q 'id="AceMq.Amqp"' \
+            || { echo "::error::the package does not depend on AceMq.Amqp"; exit 1; }
+          echo "dependency on the published AceMq.Amqp confirmed"
+
+  integration:
+    # A host, a real broker, and a shutdown. No skip path: a suite that quietly does
+    # nothing when the broker is absent reports a green tick for the thing nobody wants
+    # unverified, and the drain is precisely that thing.
+    runs-on: ubuntu-latest
+    services:
+      rabbitmq:
+        image: rabbitmq:4-alpine
+        ports:
+          - 5721:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Integration tests
+        env:
+          ACEMQ_TEST_URL: amqp://guest:guest@localhost:5721
+        run: >
+          dotnet test
+          tests/AceMq.Amqp.Hosting.IntegrationTests/AceMq.Amqp.Hosting.IntegrationTests.csproj
+          --configuration Release --verbosity normal
+
+  example:
+    # The example is built and run against a broker, because an example that has stopped
+    # compiling is worse than no example and one that has stopped working is worse still.
+    # It is the only thing in the repository that exercises the package the way an
+    # application does: appsettings.json, a handler type, OpenTelemetry, and a SIGTERM.
+    runs-on: ubuntu-latest
+    services:
+      rabbitmq:
+        image: rabbitmq:4-alpine
+        ports:
+          - 5722:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Build the example
+        run: dotnet build examples/worker/worker.csproj --configuration Release
+
+      - name: Run it, stop it, and check that it drained
+        env:
+          acemq__url: amqp://guest:guest@localhost:5722
+        run: |
+          cd examples/worker/bin/Release/net8.0
+          ./worker > worker.log 2>&1 &
+          pid=$!
+          sleep 15
+          kill -TERM "$pid"
+          # Longer than the configured drain, so a drain that overruns is a failure here
+          # rather than a timeout on the job.
+          for i in $(seq 1 30); do kill -0 "$pid" 2>/dev/null || break; sleep 1; done
+          grep -q "every handler finished" worker.log \
+            || { echo "::error::the worker did not drain cleanly"; cat worker.log; exit 1; }
+          grep -q "order o-1 " worker.log \
+            || { echo "::error::the worker consumed nothing"; cat worker.log; exit 1; }
+          echo "the example connected, consumed and drained"
+
+  docs:
+    # The docs site is built on every push, not only when it is published, because a
+    # broken link is cheapest to fix on the commit that made it.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pandoc
+        run: sudo apt-get update && sudo apt-get install -y pandoc
+
+      - name: Build the site
+        run: .github/scripts/build-docs-site.sh
