@@ -13,9 +13,9 @@ Dependency injection and hosted-service integration for
 declared topology, handlers resolved from the container, consumers that drain on shutdown,
 and a health check — configured from `appsettings.json` and nothing else.
 
-> **Status: `0.1.0`, unreleased.** 52 unit tests over the library's in-memory transport and
-> 6 integration tests against RabbitMQ 4, plus an example worker built and run against a
-> broker in CI. Built against the published `AceMq.Amqp` 0.7.0.
+> **Status: `0.1.0`, the first release.** 52 unit tests over the library's in-memory
+> transport and 6 integration tests against RabbitMQ 4, plus an example worker built and run
+> against a broker in CI. Built against the published `AceMq.Amqp` 0.7.0.
 
 ```json
 {
@@ -228,6 +228,9 @@ which. The Spring Boot starter is a separate repository on its own line for the 
 `AceMq.Amqp` is therefore a **package** dependency, not a project reference. This repository
 exists partly to prove the published package is usable from an application, and a project
 reference would prove only that its source is. CI checks the produced nuspec for it.
+
+[RELEASING.md](RELEASING.md) has the rest: where the packages are published, what the
+release-line guard refuses, and how to check that a release actually landed.
 
 ## Licence
 

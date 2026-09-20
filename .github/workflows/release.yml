@@ -1,0 +1,368 @@
+# Publish a release into the Git-hosted NuGet feed at AceMQ-Company/nuget, served
+# over GitHub Pages at https://acemq.org/nuget/ -- the same feed acemq-dotnet-amqp
+# publishes the library to, and the one NuGet.config already points this
+# repository at.
+#
+# Triggered by a tag:  git tag -a v0.1.0 -m 0.1.0 && git push origin v0.1.0
+#
+# There is no push endpoint: the feed is a static directory tree, so publishing is
+# a commit to another repository. The built-in GITHUB_TOKEN is scoped to this
+# repository and cannot write there, so the feed gets its own **deploy key**:
+#
+#   NUGET_REPO_DEPLOY_KEY  -> AceMQ-Company/nuget
+#
+# A deploy key can write to exactly one repository and nothing else, which a
+# personal access token cannot express. It belongs to the repository rather than to
+# a person, so it survives them leaving and cannot be used as them, and it does not
+# expire, so a release cannot fail at three in the morning because a token aged out.
+#
+# Rotating it: generate a key pair, replace the deploy key on the target
+# repository, then update the secret here. Both are listed under the target
+# repository's Settings -> Deploy keys.
+#
+# Unlike the library's release this one does not touch the organisation landing
+# page: that page carries a card per library, and this package is not one of them.
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish, without the leading v (e.g. 0.1.0)'
+        required: true
+
+# Least privilege for every job that does not ask for more. A job needing more
+# declares it itself, so the privileges are reviewable in the file rather than
+# inherited from an organisation setting somebody can change later.
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+      published: ${{ steps.push.outputs.published }}
+
+    # A release runs the integration suite as well as the unit tests. It is the one
+    # moment where waiting for a broker is obviously worth it: this is the artifact
+    # people depend on, and the drain -- the thing this package exists to get right
+    # -- is only really exercised against one.
+    services:
+      rabbitmq:
+        image: rabbitmq:4-alpine
+        # 5721, the port ci.yml uses, so the two suites are configured the same way
+        # and a copied command line works in both.
+        ports:
+          - 5721:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          # 8.0.x as well as 10.0.x, for the net8.0 half of the multi-target. The
+          # 10 SDK can build net8.0 by downloading the targeting pack from NuGet,
+          # which works until the day it does not; installing the SDK that carries
+          # it makes the build depend on the runner rather than on a fetch.
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Work out the version
+        id: version
+        env:
+          # Through the environment rather than interpolated into the script. A tag
+          # name and a dispatch input are both caller-controlled text, and inlining
+          # either one lets whoever writes it run shell here.
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            VERSION="$INPUT_VERSION"
+          else
+            VERSION="${TAG_NAME#v}"
+          fi
+          # An allow-list, not a deny-list. The version reaches a file path, a
+          # commit message and a package id, so anything that is not plainly a
+          # version number is refused rather than escaped.
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$'; then
+            echo "::error::not a release version: '$VERSION'"
+            exit 1
+          fi
+          # The line stays on 0.1.x until that is deliberately changed. Without
+          # this, a mistyped tag ships an 0.2.0 or a 1.0.0 that cannot be recalled --
+          # a published version is permanent even on a feed we control, because
+          # somebody's lockfile already has it. Lift this when the line moves on,
+          # in the same commit that moves <Version> in Directory.Build.props.
+          #
+          # This package is on its own line and the library is on 0.7.x, so the
+          # number here deliberately does not match the library's. That is the
+          # arrangement RELEASING.md explains, not a stale guard.
+          case "$VERSION" in
+            0.1.*) ;;
+            *)
+              echo "::error::this package releases 0.1.x only; '$VERSION' needs the guard in release.yml lifted first"
+              exit 1
+              ;;
+          esac
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "publishing $VERSION"
+
+      # Before the suite rather than after it. The publish needs a secret this
+      # workflow cannot create, and a release that discovers that after twelve
+      # minutes of tests reports it as a checkout failure against another
+      # repository -- which reads like the feed is broken rather than like a
+      # secret nobody added. Worse, the feed repository is readable without it:
+      # checkout would fall back to GITHUB_TOKEN, clone happily, and fail only at
+      # the push, with a message about permissions.
+      - name: Check the credentials the publish needs
+        env:
+          NUGET_REPO_DEPLOY_KEY: ${{ secrets.NUGET_REPO_DEPLOY_KEY }}
+        run: |
+          if [ -z "$NUGET_REPO_DEPLOY_KEY" ]; then
+            echo "::error::NUGET_REPO_DEPLOY_KEY is not set on this repository. It is the"
+            echo "::error::deploy key with write access to AceMQ-Company/nuget, and without"
+            echo "::error::it nothing can be published. See RELEASING.md."
+            exit 1
+          fi
+          echo "the feed deploy key is present"
+
+      - name: Restore
+        # The AceMQ feed is in NuGet.config, and the package it serves is the
+        # released library. A restore that resolved AceMq.Amqp from anywhere else
+        # would make the rest of this job prove nothing about what is being shipped.
+        run: dotnet restore AceMq.Amqp.Hosting.slnx
+
+      - name: Build
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: >
+          dotnet build AceMq.Amqp.Hosting.slnx --configuration Release --no-restore
+          "-p:Version=$VERSION"
+
+      - name: Unit tests
+        # --no-build throughout, so every later step operates on the assemblies
+        # that were stamped with the release version. A test run that rebuilds
+        # without -p:Version quietly restamps them with the default from
+        # Directory.Build.props, and `dotnet pack --no-build` then packages that.
+        run: >
+          dotnet test tests/AceMq.Amqp.Hosting.Tests/AceMq.Amqp.Hosting.Tests.csproj
+          --configuration Release --no-build --verbosity normal
+
+      - name: Integration tests
+        env:
+          ACEMQ_TEST_URL: amqp://guest:guest@localhost:5721
+        run: >
+          dotnet test
+          tests/AceMq.Amqp.Hosting.IntegrationTests/AceMq.Amqp.Hosting.IntegrationTests.csproj
+          --configuration Release --no-build --verbosity normal
+
+      - name: Pack
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: >
+          dotnet pack AceMq.Amqp.Hosting.slnx --configuration Release --no-build
+          "-p:Version=$VERSION"
+          --output "$RUNNER_TEMP/packages"
+
+      - name: Check what was packed
+        # The last moment before anything leaves the runner, and the only one where
+        # a wrong artifact is still recallable. Three questions, each of which has
+        # shipped wrong somewhere in this organisation: is it the version the tag
+        # asked for, does the multi-target reach the package rather than only bin,
+        # and does it depend on the published library rather than on a project
+        # reference that slipped in.
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          for p in AceMq.Amqp.Hosting AceMq.Amqp.Hosting.OpenTelemetry; do
+            nupkg="$RUNNER_TEMP/packages/$p.$VERSION.nupkg"
+            test -f "$nupkg" \
+              || { echo "::error::$p produced no $VERSION package"; ls -1 "$RUNNER_TEMP/packages"; exit 1; }
+            # The filename carries the version, but the nuspec is what a client
+            # reads, so it is the copy worth asserting on.
+            unzip -p "$nupkg" "$p.nuspec" | grep -q "<version>$VERSION</version>" \
+              || { echo "::error::$p.nuspec does not say $VERSION"; exit 1; }
+            for tfm in netstandard2.0 net8.0; do
+              unzip -l "$nupkg" | grep -q "lib/$tfm/$p.dll" \
+                || { echo "::error::$p ships no lib/$tfm"; exit 1; }
+            done
+            echo "$p $VERSION: netstandard2.0 and net8.0 both present"
+          done
+          unzip -p "$RUNNER_TEMP/packages/AceMq.Amqp.Hosting.$VERSION.nupkg" \
+            AceMq.Amqp.Hosting.nuspec | grep -q 'id="AceMq.Amqp"' \
+            || { echo "::error::the package does not depend on AceMq.Amqp"; exit 1; }
+          echo "dependency on the published AceMq.Amqp confirmed"
+
+      - name: Check out the NuGet feed
+        uses: actions/checkout@v4
+        with:
+          repository: AceMQ-Company/nuget
+          # A deploy key rather than a token: write access to this repository
+          # alone, and to nothing else in the organisation.
+          ssh-key: ${{ secrets.NUGET_REPO_DEPLOY_KEY }}
+          path: nuget-feed
+
+      - name: Add the packages to it
+        # Cloned first, then added to, so the version indexes merge with what is
+        # already published. Generating them from only this release would leave
+        # earlier versions on disk but invisible to any client that reads them.
+        working-directory: nuget-feed
+        run: ./scripts/publish.sh "$RUNNER_TEMP"/packages/*.nupkg
+
+      # `published` is the line between "nothing happened" and "something is out
+      # there". Everything before this leaves the feed untouched; everything after
+      # is operating on a version consumers can already resolve.
+      - name: Commit and push
+        id: push
+        working-directory: nuget-feed
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          git config user.name "acemq-release"
+          git config user.email "noreply@acemq.org"
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "nothing to publish; $VERSION may already exist"
+            # Already in the feed, so from a consumer's point of view this version
+            # is published. Reporting otherwise would make a re-run of a good
+            # release look like a release that never happened.
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git add -A
+          git commit -m "Publish AceMq.Amqp.Hosting $VERSION"
+          git push origin HEAD
+          echo "published=true" >> "$GITHUB_OUTPUT"
+
+      # The only check that asks what a consumer will actually get. Restoring from
+      # an empty package cache, against the public feed, catches a release whose
+      # artifacts do not match what was pushed -- a failure that otherwise surfaces
+      # days later in somebody else's build.
+      - name: Verify the published version restores
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          FEED="https://acemq.org/nuget"
+          INDEX="$FEED/v3/flatcontainer/acemq.amqp.hosting/$VERSION/acemq.amqp.hosting.$VERSION.nupkg"
+          echo "Waiting for GitHub Pages to serve $VERSION"
+          for attempt in $(seq 1 20); do
+            # -L because the organisation has a custom domain and every github.io
+            # URL answers with a redirect. NuGet follows it; a bare curl does not.
+            code=$(curl -sL -o /dev/null -w '%{http_code}' "$INDEX")
+            [ "$code" = "200" ] && break
+            echo "  attempt $attempt: HTTP $code"
+            sleep 15
+          done
+          if [ "$code" != "200" ]; then
+            echo "::error::$VERSION was pushed but is not being served at $INDEX"
+            exit 1
+          fi
+
+          mkdir -p "$RUNNER_TEMP/verify" && cd "$RUNNER_TEMP/verify"
+          cat > nuget.config <<'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <packageSources>
+              <clear />
+              <add key="acemq" value="https://acemq.org/nuget/index.json" />
+              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+            </packageSources>
+          </configuration>
+          XML
+          dotnet new classlib -n Verify -o . --force
+          # An empty package cache, so nothing can resolve from what this build
+          # just produced. A release that only works on the machine that made it is
+          # the failure being guarded against. This also pulls AceMq.Amqp and
+          # AceMq.Amqp.RabbitMq down as dependencies, so the version range in the
+          # nuspec is exercised rather than assumed.
+          dotnet add package AceMq.Amqp.Hosting --version "$VERSION" \
+            --package-directory "$RUNNER_TEMP/verify-packages"
+          dotnet add package AceMq.Amqp.Hosting.OpenTelemetry --version "$VERSION" \
+            --package-directory "$RUNNER_TEMP/verify-packages"
+          test -d "$RUNNER_TEMP/verify-packages/acemq.amqp" \
+            || { echo "::error::AceMq.Amqp did not come down as a dependency"; exit 1; }
+          echo "$VERSION restores from a clean cache."
+
+      - name: Where it landed
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          echo "Published AceMq.Amqp.Hosting and AceMq.Amqp.Hosting.OpenTelemetry, $VERSION"
+          echo "Feed: https://acemq.org/nuget/"
+
+  # The GitHub release is what people subscribe to. Created after the feed push, so
+  # it never advertises a version that failed to publish.
+  announce:
+    needs: publish
+    if: needs.publish.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.publish.outputs.version }}
+        run: |
+          gh release create "v$VERSION" \
+            --title "v$VERSION" \
+            --notes "AceMQ hosting for .NET $VERSION.
+
+          \`\`\`bash
+          dotnet nuget add source https://acemq.org/nuget/index.json --name acemq
+          dotnet add package AceMq.Amqp.Hosting --version $VERSION
+          \`\`\`
+
+          Documentation: https://acemq.org/acemq-dotnet-amqp-hosting/" \
+            || echo "release v$VERSION already exists"
+
+  # A version that is published but did not finish its release is the genuinely
+  # dangerous state: consumers can already resolve it while the release notes still
+  # name the previous one. That is worth interrupting someone for, which is why
+  # this fires on success as well as failure -- unlike the documentation build,
+  # where only failures are worth a message.
+  notify:
+    needs: [publish, announce]
+    if: always() && needs.publish.outputs.published == 'true'
+    uses: AceMQ-Company/acemq-java-amqp/.github/workflows/slack-notify.yml@main
+    with:
+      status: >-
+        ${{ needs.announce.result == 'success' && 'success' || 'failure' }}
+      title: >-
+        ${{ needs.announce.result == 'success'
+            && format('AceMQ hosting for .NET {0} released', needs.publish.outputs.version)
+            || format('AceMQ hosting for .NET {0} is published but the release did not finish', needs.publish.outputs.version) }}
+      message: >-
+        ${{ needs.announce.result == 'success'
+            && 'AceMq.Amqp.Hosting and AceMq.Amqp.Hosting.OpenTelemetry are on the NuGet feed. Consumers need no credentials.'
+            || 'The packages are on the feed and consumers can resolve them, but the release notes were not created. Check the run.' }}
+      # Roadworks rather than a red dot for the half-finished case: the release is
+      # usable and unfinished, which is a different thing from broken and reads
+      # differently at a glance.
+      #
+      # Both branches name an emoji. Leaving the success branch empty to fall back
+      # on the status-derived tick does not work -- in GitHub's expression language
+      # `a && '' || b` yields b, because an empty string is falsy, so every
+      # successful release would be announced with roadworks. That cost the Java
+      # library nine releases before anyone noticed.
+      icon: >-
+        ${{ needs.announce.result == 'success' && ':white_check_mark:' || ':construction:' }}
+      url: https://acemq.org/nuget/
+    secrets:
+      # Explicit, not `inherit`. A reusable workflow in another repository does not
+      # receive inherited secrets, so `inherit` produced a notify job that went
+      # green while sending nothing at all. Where the secret is absent the
+      # notification does nothing and succeeds: a missing webhook must never fail a
+      # release that worked.
+      SLACK_DELIVERY_WEBHOOK: ${{ secrets.SLACK_DELIVERY_WEBHOOK }}

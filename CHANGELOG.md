@@ -11,6 +11,16 @@ one of the two had moved.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-20
+
+The first release. Dependency injection and hosted-service integration for AceMQ AMQP:
+one `AddAceMq` call, handlers resolved from the container, a consumer host that drains on
+shutdown, and a health check.
+
+**Built against the published `AceMq.Amqp` 0.7.0**, from
+<https://acemq.org/nuget/index.json>. The nuspec asks for 0.7.0 or newer, so an
+application already on a later library keeps it.
+
 ### Added
 
 - `AddAceMq` on `IServiceCollection`: binds the `acemq` configuration section, registers an
@@ -35,11 +45,47 @@ one of the two had moved.
   to the broker rather than being abandoned against a closing connection. Honours the host's
   own `ShutdownTimeout` as well as `acemq:listener:shutdownTimeout`, and warns at startup
   when the two are set so that the host would stop waiting first.
+
+  The drain is bounded by the host's own token, through
+  `DrainConsumersAsync(TimeSpan, CancellationToken)`, where cancelling abandons the wait and
+  not the work: the handlers are not interrupted and consuming stays paused. The two ways a
+  drain can end are different log lines, which is the point — a drain that was given long
+  enough and did not finish, and a drain the host stopped waiting for. The second names both
+  deadlines and says which to change, because that one is a misconfiguration rather than a
+  slow handler.
+
+  A finished drain says how many deliveries it handed back. "Every handler finished" — which
+  is all a drain ever guarantees — is logged alongside `AceMqConnection.Held`, the number of
+  messages fetched and never handled, rather than leaving the reader to infer it from a
+  queue-depth graph after the fact.
 - `AceMqHealthCheck`, registered as `acemq` and tagged `ready`. A blocked connection is
   reported **healthy with the reason**, matching the Spring Boot starter: an application
   that fails its own health check for back pressure is one an orchestrator restarts into the
   same blocked broker. Draining is reported unhealthy, which is the opposite decision for
   the opposite reason.
+
+  Its `Data` is the library's connection report, passed through rather than rebuilt, **so
+  every value in it is a string**:
+
+  ```json
+  { "open": "true", "blocked": "false", "transport": "rabbitmq",
+    "inFlight": "0", "held": "0", "consumers": "1" }
+  ```
+
+  Worth knowing before writing an alert rule against it: `HealthReport.Details` in the
+  library is an `IReadOnlyDictionary<string, string>`, so a rule of the form
+  `data.blocked == true` never fires — match `"true"`. `consumers` is this package's own
+  count and is rendered the same way deliberately, so a reader of the dictionary needs one
+  rule rather than two. `held` counts deliveries fetched and waiting at the pause gate;
+  `blockedReason` appears only when the broker gave one; `consuming` and `publishing`
+  appear with the value `"paused"` only while they are; `check.{name}` appears per
+  registered contributor.
+
+  The blocked description — `the broker has blocked this connection:` followed by the
+  broker's reason — is the sentence the Go, Python and Ruby libraries also use, so a single
+  alert rule reads a blocked broker in any of them. .NET's framework hands back a
+  structured dictionary alongside the description, so here the fact lives in `blocked` and
+  the sentence is for the human reading a dashboard.
 - `AceMq.Amqp.Hosting.OpenTelemetry`: `AddAceMqInstrumentation()` on `TracerProviderBuilder`
   and `MeterProviderBuilder`. A separate package so that an application without
   OpenTelemetry does not carry it; it depends on `OpenTelemetry.Api` only, not the SDK.
@@ -49,72 +95,6 @@ one of the two had moved.
   has stopped working is worse than none.
 - Documentation at <https://acemq.org/acemq-dotnet-amqp-hosting/> — eleven pages, including
   a lifecycle page that is specific about what a drain does *not* finish.
-
-### Changed
-
-- **Built against `AceMq.Amqp` 0.7.0**, up from 0.6.0. Both workarounds this package
-  carried for 0.6.0 are gone with it, and both of them were visible from outside.
-
-- **The health check's `Data` is the library's connection report, verbatim — so every value
-  in it is now a string.** This is the one change worth reading twice, because an alert or
-  a dashboard matching the old shape stops matching and nothing errors when it does.
-
-  Before, a healthy connection:
-
-  ```json
-  { "transport": "rabbitmq", "open": true, "blocked": false, "inFlight": 0, "consumers": 1 }
-  ```
-
-  After:
-
-  ```json
-  { "open": "true", "blocked": "false", "transport": "rabbitmq",
-    "inFlight": "0", "held": "0", "consumers": "1" }
-  ```
-
-  Every key that was there is still there and still spelled the same way. What changed is
-  the values: `true` became `"true"` and `0` became `"0"`, because `HealthReport.Details`
-  in the library is an `IReadOnlyDictionary<string, string>` and this package no longer
-  rebuilds it. `consumers` is this package's own count and was rendered the same way
-  deliberately, so that a reader of the dictionary needs one rule rather than two.
-
-  **A rule of the form `data.blocked == true` now never fires.** Match `"true"` instead.
-  One that tests for truthiness, or compares the rendered text, is unaffected — which is
-  the danger: the rules that break break silently.
-
-  Two keys are new, both from the library: `held`, the count of deliveries fetched and
-  waiting at the pause gate, and `consuming` / `publishing`, present with the value
-  `"paused"` only while they are. `blockedReason` still appears only when the broker gave
-  one, and `check.{name}` per registered contributor is unchanged.
-
-  The descriptions are unchanged, including the blocked one — `the broker has blocked this
-  connection:` followed by the broker's reason. A health report carries no description for
-  the library to have produced, and an instance whose publishing is stalled must not
-  describe itself as "connected, 0 in flight". The Go, Python and Ruby libraries agree on
-  one sentence for this so that a single alert rule reads a blocked broker in any of them;
-  .NET's framework hands back a structured dictionary alongside the description, so here
-  the fact lives in `blocked` and the sentence is for the human reading a dashboard.
-
-  Why it was ever rebuilt: up to 0.6.0 the library reported a blocked connection as
-  `Degraded`, and because the aggregate takes the worst report, folding the connection's
-  own report in would have let that overrule the careful answer this check composes. So the
-  connection's report was left out of the fold and its facts rebuilt from `IsOpen`,
-  `IsBlocked` and `BlockedReason`. 0.7.0 reports a blocked connection as `Up`, with
-  `blocked` and `blockedReason` among its details, and the workaround went with its reason.
-
-- **The drain is bounded by the host's own token rather than raced against a `Task.Delay`.**
-  0.7.0 adds `DrainConsumersAsync(TimeSpan, CancellationToken)`, where cancelling abandons
-  the wait and not the work: the handlers are not interrupted and consuming stays paused.
-  Visible in the logs, which is the point — a drain that was given long enough and did not
-  finish and a drain the host stopped waiting for are now different lines. The second names
-  both deadlines and says which to change, because that one is a misconfiguration rather
-  than a slow handler.
-
-- **A finished drain says how many deliveries it handed back.** 0.7.0 added
-  `AceMqConnection.Held`, so "every handler finished" — which is all a drain ever
-  guaranteed — can be logged alongside the number of messages that were fetched and never
-  handled, instead of leaving the reader to infer it from a queue-depth graph after the
-  fact. It is also the `held` key in the health data.
 
 ### Notes
 
@@ -143,10 +123,13 @@ one of the two had moved.
   gives completion on the `AddAceMq(o => ...)` callback, not in the JSON file.
 - A drain is bounded by `concurrency`, not by `prefetch`: a delivery the broker has sent but
   no handler has taken is held and redelivered rather than handled, which differs from the
-  Go library and is documented on the lifecycle page. Still a difference, but no longer an
-  invisible one — `AceMqConnection.Held` counts them, and the drain log line and the health
+  Go library and is documented on the lifecycle page. It is a visible difference rather than
+  a silent one — `AceMqConnection.Held` counts them, and the drain log line and the health
   data both report it.
 - `acemq:blockedTimeout` exists in the Spring starter and not here, because the .NET
   library's `ConnectionConfig` has no equivalent to set.
 
-[Unreleased]: https://github.com/AceMQ-Company/acemq-dotnet-amqp-hosting/commits/main
+How a release is cut is in [RELEASING.md](RELEASING.md).
+
+[Unreleased]: https://github.com/AceMQ-Company/acemq-dotnet-amqp-hosting/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/AceMQ-Company/acemq-dotnet-amqp-hosting/releases/tag/v0.1.0
