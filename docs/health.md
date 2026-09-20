@@ -23,9 +23,23 @@ app.MapHealthChecks("/readyz", new HealthCheckOptions
 | shutting down | Unhealthy, `"draining"` | |
 | `acemq:enabled` is false | Healthy | nothing was asked of it |
 
-The data dictionary carries `transport`, `open`, `blocked`, `inFlight`, `consumers`, a
-`blockedReason` when there is one, and a `check.{name}` entry per contributor. Those are
-the facts worth having in an incident.
+The data dictionary carries `transport`, `open`, `blocked`, `inFlight`, `held`,
+`consumers`, a `blockedReason` when there is one, `consuming` and `publishing` when either
+is paused, and a `check.{name}` entry per contributor. Those are the facts worth having in
+an incident.
+
+**Every value is a string.** `open` is `"true"`, not `true`; `inFlight` is `"0"`, not `0`.
+Most of them come straight out of the library's own `connection.Health()` report, and that
+report is a `IReadOnlyDictionary<string, string>`; `consumers` is this package's own count
+and is rendered the same way so that a reader needs one rule rather than two. A rule
+written against a boolean or a number silently stops matching — see
+[the changelog](https://github.com/AceMQ-Company/acemq-dotnet-amqp-hosting/blob/main/CHANGELOG.md)
+if you wrote one before `AceMq.Amqp` 0.7.0.
+
+`held` is new in `AceMq.Amqp` 0.7.0 and is worth an eye during a shutdown: it counts
+deliveries the broker has already sent that are waiting at the pause gate, fetched and not
+handled. A finished drain means every *handler* finished, not that `held` was zero. See
+[the lifecycle page](lifecycle.md).
 
 ## A blocked connection is not a reason to restart
 
@@ -43,8 +57,17 @@ framework's own defaults, so it would have been harmless there — but
 `HealthCheckOptions.ResultStatusCodes` is routinely changed to map Degraded to 503, and a
 choice whose safety depends on a setting in somebody else's file is not a choice.
 
-If you want an alert on it, alert on `blocked` in the data, or on the broker's own metrics.
-Blocked is an operational fact about the broker, not a verdict on this instance.
+If you want an alert on it, alert on `blocked == "true"` in the data, or on the broker's
+own metrics. Blocked is an operational fact about the broker, not a verdict on this
+instance.
+
+The data key is the contract here, not the sentence. The Go, Python and Ruby libraries all
+write one identical sentence for a blocked connection so that a single alert rule reads a
+blocked broker whatever a service is written in; .NET's framework gives a structured
+dictionary alongside the description, so the dictionary is where the fact lives and
+`blocked` is the key to match. The description — `the broker has blocked this connection:`
+followed by the broker's reason — is this package's own wording and is meant for a human
+reading a dashboard.
 
 ## Draining is unhealthy, and that is the opposite decision
 
@@ -82,10 +105,16 @@ Predicate = r => r.Tags.Contains("ready") && !r.Tags.Contains("acemq")
 ## Contributors
 
 Anything registered with the library — `connection.RegisterHealth(contributor)`, or an
-`OrderedQueue`, which registers itself — is folded in, and the worst of them wins.
+`OrderedQueue`, which registers itself — is folded in, and the worst of them wins. Each
+appears as `check.{name}` in the data, with `Up`, `Degraded` or `Down` for a value.
 
-The connection's **own** report is deliberately left out of that fold. The library calls a
-blocked connection degraded; taking the worst of every report would let that overrule the
-careful answer above with the plain one. What the connection reports is reconstructed here
-from `IsOpen`, `IsBlocked` and `BlockedReason` instead. The Go library's lifecycle guide
-runs into exactly the same trap from the other direction and documents the same workaround.
+The connection's own report is folded in with them, and its details are copied into the
+data as they are.
+
+That is only true from `AceMq.Amqp` 0.7.0. Up to 0.6.0 the library reported a blocked
+connection as `Degraded`, and since the worst report wins, folding the connection's own
+report in would have let that one reading overrule the careful answer above with a plain
+one. So this package left the connection's report out of the fold and rebuilt the facts
+from `IsOpen`, `IsBlocked` and `BlockedReason` instead. 0.7.0 reports a blocked connection
+as `Up`, with `blocked` and `blockedReason` among its details, and the workaround went with
+the reason for it.

@@ -212,7 +212,9 @@ namespace AceMq.Amqp.Hosting
         ///
         /// <para>First the connection stops handing messages to handlers. A delivery the
         /// broker has already sent is held rather than rejected, so a consumer keeps its
-        /// place in the queue.</para>
+        /// place in the queue. <see cref="AceMqConnection.Held"/> counts those, and they
+        /// are the reason a finished drain is not the same thing as an empty queue: they
+        /// were fetched and never handled, and the broker redelivers them.</para>
         ///
         /// <para>Then it waits for the handlers that were already running. Each of them
         /// finishes and its decision is carried out — the message is acknowledged, or
@@ -227,9 +229,12 @@ namespace AceMq.Amqp.Hosting
         /// messages are redelivered, at the same attempt number, after the restart.</para>
         /// </remarks>
         /// <param name="cancellationToken">
-        /// The host's own shutdown deadline. Honoured as well as the configured one,
-        /// because the host stops waiting at <c>HostOptions.ShutdownTimeout</c> whatever
-        /// this package would have preferred.
+        /// The host's own shutdown deadline, handed straight to the drain. Honoured as well
+        /// as the configured one, because the host stops waiting at
+        /// <c>HostOptions.ShutdownTimeout</c> whatever this package would have preferred.
+        /// Cancellation and overrun are logged as the different events they are: the first
+        /// is the host taking its deadline back, the second is the drain having been given
+        /// long enough and the handlers not finishing.
         /// </param>
         /// <returns>A task that completes when the drain has finished or given up.</returns>
         public async Task StopAsync(CancellationToken cancellationToken)
@@ -266,17 +271,24 @@ namespace AceMq.Amqp.Hosting
                 connection.InFlight,
                 budget);
 
-            // DrainConsumersAsync pauses and then polls, and it does not take a token. The
-            // race against the host's own deadline is run here so that a host that is about
-            // to kill the process is not waited past.
-            var drain = connection.DrainConsumersAsync(budget);
+            // The host's own deadline goes to the drain rather than being raced against it
+            // from out here. Cancelling abandons the wait, not the work: the handlers keep
+            // running and consuming stays paused, which is why the cancellation has to be
+            // followed by the same tidying up as an overrun.
             var drained = false;
+            var abandoned = false;
             try
             {
-                var finished = await Task
-                    .WhenAny(drain, Delay(budget, cancellationToken))
+                drained = await connection
+                    .DrainConsumersAsync(budget, cancellationToken)
                     .ConfigureAwait(false);
-                drained = finished == drain && await drain.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                // Not the same event as the drain running out of time, and logged
+                // separately: this one is the host taking its deadline back, and the budget
+                // below never got to be the thing that decided.
+                abandoned = true;
             }
             catch (Exception e)
             {
@@ -285,18 +297,48 @@ namespace AceMq.Amqp.Hosting
 
             if (drained)
             {
-                _log.LogInformation(
-                    "drained in {Elapsed}; every handler finished", clock.Elapsed);
+                // True means every handler finished. It does not mean every message the
+                // broker sent was handled: a delivery fetched and waiting at the pause gate
+                // is held, not handled, and comes back from the broker after the restart.
+                var held = connection.Held;
+                if (held > 0)
+                {
+                    _log.LogInformation(
+                        "drained in {Elapsed}; every handler finished. {Held} delivery(ies) " +
+                        "were fetched but never handled — they are unacknowledged and the " +
+                        "broker will redeliver them.",
+                        clock.Elapsed,
+                        held);
+                }
+                else
+                {
+                    _log.LogInformation(
+                        "drained in {Elapsed}; every handler finished", clock.Elapsed);
+                }
+            }
+            else if (abandoned)
+            {
+                _log.LogWarning(
+                    "the host stopped waiting after {Elapsed}, before the {Budget} the drain " +
+                    "was given: {InFlight} handler(s) still running and {Held} delivery(ies) " +
+                    "held. Cancelling the handlers; their messages are unacknowledged and the " +
+                    "broker will redeliver them. Raise HostOptions.ShutdownTimeout, or lower " +
+                    "acemq:listener:shutdownTimeout below it.",
+                    clock.Elapsed,
+                    budget,
+                    connection.InFlight,
+                    connection.Held);
             }
             else
             {
                 _log.LogWarning(
                     "the drain did not finish within {Budget}: {InFlight} handler(s) still " +
-                    "running after {Elapsed}. Cancelling them; their messages are unacknowledged " +
-                    "and the broker will redeliver them.",
+                    "running after {Elapsed}, {Held} delivery(ies) held. Cancelling them; their " +
+                    "messages are unacknowledged and the broker will redeliver them.",
                     budget,
                     connection.InFlight,
-                    clock.Elapsed);
+                    clock.Elapsed,
+                    connection.Held);
             }
 
             // Last, never first.
@@ -328,18 +370,6 @@ namespace AceMq.Amqp.Hosting
                 "given. Set the drain shorter than the host's, or raise the host's.",
                 listener.ShutdownTimeout,
                 host);
-        }
-
-        private static async Task Delay(TimeSpan budget, CancellationToken cancellationToken)
-        {
-            try
-            {
-                await Task.Delay(budget, cancellationToken).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                // The host's deadline arriving is the answer, not an error.
-            }
         }
     }
 }

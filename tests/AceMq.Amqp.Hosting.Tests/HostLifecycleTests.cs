@@ -261,10 +261,19 @@ public class HostLifecycleTests
 
         var up = await check.CheckHealthAsync(context);
         Assert.Equal(HealthStatus.Healthy, up.Status);
+
+        // The library's own connection report, verbatim, which is why every value is a
+        // string. Rebuilding it here with booleans and longs is what this package did while
+        // AceMq.Amqp called a blocked connection degraded; 0.7.0 calls it up, and the
+        // rebuild went with the reason for it.
         Assert.Equal("in-memory", up.Data["transport"]);
-        Assert.Equal(true, up.Data["open"]);
-        Assert.Equal(false, up.Data["blocked"]);
-        Assert.Equal(1, up.Data["consumers"]);
+        Assert.Equal("true", up.Data["open"]);
+        Assert.Equal("false", up.Data["blocked"]);
+        Assert.Equal("0", up.Data["inFlight"]);
+        // New in 0.7.0: deliveries fetched and waiting at the pause gate.
+        Assert.Equal("0", up.Data["held"]);
+        Assert.Equal("1", up.Data["consumers"]);
+        Assert.All(up.Data.Values, v => Assert.IsType<string>(v));
 
         await host.StopAsync();
 

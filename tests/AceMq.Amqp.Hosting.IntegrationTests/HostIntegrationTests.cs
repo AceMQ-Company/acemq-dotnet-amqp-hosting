@@ -234,9 +234,14 @@ public class HostIntegrationTests
 
         var report = await check.CheckHealthAsync(new HealthCheckContext());
         Assert.Equal(HealthStatus.Healthy, report.Status);
+
+        // Straight out of AceMqConnection.Health(), so string values throughout.
         Assert.Equal("rabbitmq", report.Data["transport"]);
-        Assert.Equal(false, report.Data["blocked"]);
-        Assert.Equal(1, report.Data["consumers"]);
+        Assert.Equal("true", report.Data["open"]);
+        Assert.Equal("false", report.Data["blocked"]);
+        Assert.Equal("0", report.Data["held"]);
+        Assert.Equal("1", report.Data["consumers"]);
+        Assert.False(report.Data.ContainsKey("blockedReason"));
 
         await host.StopAsync();
         Assert.Equal(

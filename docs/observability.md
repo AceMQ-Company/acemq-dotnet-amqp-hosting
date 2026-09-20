@@ -77,8 +77,14 @@ did it:
 | `AceMq.Amqp.Hosting.AceMqConnectionHost` | Information | the topology plan, when it changed anything |
 | | Warning | drift between the declared topology and the broker's |
 | `AceMq.Amqp.Hosting.AceMqConsumerHost` | Information | each consumer starting, with its queue, concurrency and prefetch |
-| | Information | the drain beginning, and how long it took |
-| | Warning | a drain that overran, and the shutdown-timeout misconfiguration that causes most of them |
+| | Information | the drain beginning, how long it took, and how many deliveries it handed back unhandled |
+| | Warning | a drain that overran, a drain the host stopped waiting for, and the shutdown-timeout misconfiguration that causes most of them |
+
+Those last two are logged as the separate events they are. A drain that ran out of its own
+`listener:shutdownTimeout` names that budget; a drain the host cancelled at
+`HostOptions.ShutdownTimeout` says so and names both times, which is the difference between
+"the handlers are too slow" and "the deadline is set wrong". See
+[startup and shutdown](lifecycle.md#the-two-deadlines).
 
 The connection URL is logged with its password replaced. That is the library's `ToString`,
 not something this package does, and it is worth knowing it is there rather than

@@ -116,15 +116,38 @@ The practical consequences, both of them real:
 says. It does not mean *every message the broker had sent was handled*. If that stronger
 guarantee is what you need, keep prefetch close to concurrency.
 
+How many that was is now a number rather than an inference. `AceMq.Amqp` 0.7.0 added
+`AceMqConnection.Held`, the count of deliveries fetched and waiting at the pause gate, and
+this package reads it: it appears as `held` in the [health data](health.md) and in the
+drain's own log lines, so a shutdown says how many messages it handed back as well as that
+it finished.
+
+```
+drained in 00:00:00.8140000; every handler finished. 7 delivery(ies) were fetched but
+never handled — they are unacknowledged and the broker will redeliver them.
+```
+
+A shutdown with no held deliveries logs the shorter line, unchanged.
+
 ## The two deadlines
 
 `listener:shutdownTimeout` is what the drain is given. `HostOptions.ShutdownTimeout` —
 thirty seconds unless changed — is when the host stops waiting for hosted services at all.
 **The smaller one wins, and it is the host's.**
 
-A drain configured for sixty seconds under a host that waits thirty gets thirty, and the
-handlers are cancelled by the host rather than by the drain, without the log line that would
-have explained it. `AceMqConsumerHost` warns at startup when the two are set that way round:
+A drain configured for sixty seconds under a host that waits thirty gets thirty. The host's
+token is handed to the drain itself, so the two endings stay distinguishable and each has
+its own log line: a drain that was given long enough and did not finish says so against its
+budget, and a drain the host stopped waiting for says *that* instead, naming both times.
+
+```
+the host stopped waiting after 00:00:30, before the 00:01:00 the drain was given: 3
+handler(s) still running and 0 delivery(ies) held. ... Raise HostOptions.ShutdownTimeout,
+or lower acemq:listener:shutdownTimeout below it.
+```
+
+`AceMqConsumerHost` also warns at startup when the two are set that way round, before any
+message has been taken:
 
 ```
 acemq:listener:shutdownTimeout is 00:01:00 and the host's ShutdownTimeout is 00:00:30.

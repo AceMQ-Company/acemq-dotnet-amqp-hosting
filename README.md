@@ -15,7 +15,7 @@ and a health check — configured from `appsettings.json` and nothing else.
 
 > **Status: `0.1.0`, unreleased.** 52 unit tests over the library's in-memory transport and
 > 6 integration tests against RabbitMQ 4, plus an example worker built and run against a
-> broker in CI. Built against the published `AceMq.Amqp` 0.6.0.
+> broker in CI. Built against the published `AceMq.Amqp` 0.7.0.
 
 ```json
 {
@@ -220,7 +220,7 @@ Three honest limits follow from that table, and they are each expanded on the
 
 ## Its own version line
 
-0.1.0, while the library is at 0.6.0. This package tracks two release trains — AceMQ's and
+0.1.0, while the library is at 0.7.0. This package tracks two release trains — AceMQ's and
 Microsoft.Extensions' — and a change in either can force a release here. A shared version
 number could only say that one of the two had moved, which tells a consumer nothing about
 which. The Spring Boot starter is a separate repository on its own line for the same reason.

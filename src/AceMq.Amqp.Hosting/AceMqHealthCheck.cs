@@ -51,11 +51,20 @@ namespace AceMq.Amqp.Hosting
     /// immediately, which is what taking it out of a readiness probe does. The check is
     /// tagged <c>ready</c>, and it should not be used for liveness — a process that cannot
     /// reach its broker is not a process restarting fixes.</para>
+    ///
+    /// <para>The facts in <c>Data</c> come from <see cref="AceMqConnection.Health"/>
+    /// verbatim, which makes every value a string — <c>"true"</c>, not <c>true</c>. Up to
+    /// <c>AceMq.Amqp</c> 0.6.0 they were rebuilt here from the connection's properties,
+    /// because the library reported a blocked connection as degraded and the worst report
+    /// wins; 0.7.0 reports it as up, so there is nothing left to rebuild.</para>
     /// </remarks>
     public sealed class AceMqHealthCheck : IHealthCheck
     {
         /// <summary>The name this check is registered under.</summary>
         public const string Name = "acemq";
+
+        /// <summary>The name the library gives its own report about the connection.</summary>
+        private const string ConnectionReport = "connection";
 
         private readonly IAceMqConnectionProvider _connections;
         private readonly AceMqConsumerHost _consumers;
@@ -90,16 +99,32 @@ namespace AceMq.Amqp.Hosting
                 return Done(HealthCheckResult.Unhealthy("not connected"));
             }
 
-            var data = new Dictionary<string, object>
-            {
-                ["transport"] = connection.TransportName,
-                ["open"] = connection.IsOpen,
-                ["blocked"] = connection.IsBlocked,
-                ["inFlight"] = connection.InFlight,
-                ["consumers"] = _consumers.Running.Count,
-            };
+            // The connection's own report and everything the application registered with
+            // it — an ordered queue with a halted partition, say. All of it, including the
+            // connection's: from 0.7.0 the library calls a blocked connection up, so
+            // folding it in no longer overrules the careful answer below with a plain one.
+            var health = connection.Health();
 
-            if (connection.BlockedReason != null) data["blockedReason"] = connection.BlockedReason;
+            var data = new Dictionary<string, object>();
+            foreach (var report in health.Reports)
+            {
+                if (string.Equals(report.Name, ConnectionReport, StringComparison.Ordinal))
+                {
+                    // Verbatim, so a detail the library learns to report later arrives here
+                    // without a change. The cost is that the values are the library's
+                    // strings rather than booleans and numbers.
+                    foreach (var detail in report.Details) data[detail.Key] = detail.Value;
+                }
+                else
+                {
+                    data["check." + report.Name] = report.Status.ToString();
+                }
+            }
+
+            // The one fact the connection cannot know. A string like the rest, so that
+            // every value in the dictionary has the same type and a reader needs one rule.
+            data["consumers"] = _consumers.Running.Count
+                .ToString(CultureInfo.InvariantCulture);
 
             if (_consumers.IsDraining)
             {
@@ -108,41 +133,32 @@ namespace AceMq.Amqp.Hosting
 
             if (!connection.IsOpen)
             {
+                // The library reports this as down too, and the aggregate below would
+                // catch it. Answered here because "connection reported down" is a worse
+                // sentence than this one for the status that matters most.
                 return Done(HealthCheckResult.Unhealthy(
                     "the connection is not open", exception: null, data));
             }
 
-            // Everything the application registered with the connection — an ordered queue
-            // with a halted partition, say. The connection's own report is skipped: it
-            // calls a blocked connection degraded, and taking the worst of the reports
-            // would let that overrule the careful answer above with the plain one.
-            var contributors = connection.Health().Reports
-                .Where(r => !string.Equals(r.Name, "connection", StringComparison.Ordinal))
-                .ToList();
-
-            foreach (var report in contributors)
-            {
-                data["check." + report.Name] = report.Status.ToString();
-            }
-
-            var worst = contributors.Count == 0
-                ? AceHealthStatus.Up
-                : contributors.Max(r => r.Status);
-
-            if (worst == AceHealthStatus.Down)
+            if (health.Status == AceHealthStatus.Down)
             {
                 return Done(HealthCheckResult.Unhealthy(
-                    Describe(contributors, AceHealthStatus.Down), exception: null, data));
+                    Describe(health.Reports, AceHealthStatus.Down), exception: null, data));
             }
 
-            if (worst == AceHealthStatus.Degraded)
+            if (health.Status == AceHealthStatus.Degraded)
             {
                 return Done(HealthCheckResult.Degraded(
-                    Describe(contributors, AceHealthStatus.Degraded), exception: null, data));
+                    Describe(health.Reports, AceHealthStatus.Degraded), exception: null, data));
             }
 
             if (connection.IsBlocked)
             {
+                // The description is this package's own words: a health report has no
+                // description for it to have produced, and an instance whose publishing is
+                // stalled must not describe itself as "connected, 0 in flight". What an
+                // alert should read, though, is `blocked` in the data — that is the key the
+                // library sets and the one the Go, Python and Ruby libraries agree on.
                 var reason = connection.BlockedReason ?? "no reason given";
                 return Done(HealthCheckResult.Healthy(
                     "the broker has blocked this connection: " + reason, data));
