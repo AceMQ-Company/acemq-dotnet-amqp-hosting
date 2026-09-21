@@ -16,7 +16,7 @@
     <Version>0.1.0</Version>
 
     <!-- The released AceMQ for .NET this is built and tested against. -->
-    <AceMqVersion>0.7.0</AceMqVersion>
+    <AceMqVersion>0.7.1</AceMqVersion>
 
     <!--
       Microsoft.Extensions on the 8.0 line, not the newest. 8.0 is the last line
