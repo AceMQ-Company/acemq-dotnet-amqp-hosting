@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   pull_request:
+  # AceMq.Amqp can release without a commit landing here, so this workflow also
+  # runs on a timer. That is the only thing that will ever notice a release
+  # moving underneath an untouched repository -- which is how AceMqVersion was
+  # still 0.7.0 on the day acemq-dotnet-amqp released 0.7.1.
+  schedule:
+    - cron: '47 6 * * 1'
   workflow_dispatch:
 
 concurrency:
@@ -181,3 +187,58 @@ jobs:
 
       - name: Build the site
         run: .github/scripts/build-docs-site.sh
+
+  tracks-the-release:
+    # A job of its own rather than another step in `build`, deliberately. A stale
+    # pin and a broken package are different findings and both are worth having:
+    # everything above still builds, still tests and still drains whatever this
+    # job concludes, so a red X here reads as "the pinned library is old", never
+    # as "we have no idea whether any of this works".
+    #
+    # acemq-dotnet-amqp-examples has carried this job for a while and it earns its
+    # keep -- it caught that repository within an hour of a release. This one
+    # needed it more. An examples repository pinned old proves something about a
+    # version nobody installs; this package *ships* its AceMq.Amqp dependency to
+    # every application that adds AceMq.Amqp.Hosting, so a pin left behind here
+    # reaches consumers as a nuspec dependency range they did not choose.
+    # AceMqVersion was 0.7.0 on the day 0.7.1 released, and nothing said so.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: The pinned library is the newest released one
+        # Hard failure rather than a warning. A warning in a log is exactly what
+        # lets a version sit behind for releases at a time, and a green build is
+        # read as an answer rather than as a check nobody looked at.
+        #
+        # There is a real cost: a library release legitimately lands before this
+        # repository is updated, and during that window this job is red on a
+        # repository nobody has broken. That window is the thing being measured
+        # and the fix is a one-line bump in Directory.Build.props.
+        #
+        # The tags are asked of the library repository rather than of the NuGet
+        # feed: git ls-remote needs no token, which matters on a scheduled run,
+        # and the tag is what the release was cut from.
+        run: |
+          pinned=$(sed -n 's/.*<AceMqVersion>\(.*\)<\/AceMqVersion>.*/\1/p' Directory.Build.props | head -1)
+          newest=$(git ls-remote --tags https://github.com/AceMQ-Company/acemq-dotnet-amqp \
+                     | grep -v '\^{}' | sed 's#.*refs/tags/##' \
+                     | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sed 's/^v//' \
+                     | sort -V | tail -1)
+
+          # An empty answer means the listing failed or the tag naming changed,
+          # and comparing against nothing would pass silently forever.
+          if [ -z "$newest" ]; then
+            echo "::error::no release tags found on acemq-dotnet-amqp, so the pin could not be checked"
+            exit 1
+          fi
+          if [ -z "$pinned" ]; then
+            echo "::error::no <AceMqVersion> found in Directory.Build.props, so the pin could not be checked"
+            exit 1
+          fi
+
+          if [ "$pinned" != "$newest" ]; then
+            echo "::error::Directory.Build.props pins AceMq.Amqp $pinned but the newest release is $newest. Edit <AceMqVersion> in Directory.Build.props and set it to $newest, then build and pack against it."
+            exit 1
+          fi
+          echo "pinned AceMq.Amqp $pinned, which is the newest release"
