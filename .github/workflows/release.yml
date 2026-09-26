@@ -108,10 +108,12 @@ jobs:
           # This package is on its own line and the library is on 0.7.x, so the
           # number here deliberately does not match the library's. That is the
           # arrangement RELEASING.md explains, not a stale guard.
+          # Lifted to 0.2.x for 0.2.0, which adds AceMqConsumerRegistration.Idempotency.
+          # New public surface on a type an application configures is not a patch.
           case "$VERSION" in
-            0.1.*) ;;
+            0.2.*) ;;
             *)
-              echo "::error::this package releases 0.1.x only; '$VERSION' needs the guard in release.yml lifted first"
+              echo "::error::this package releases 0.2.x only; '$VERSION' needs the guard in release.yml lifted first"
               exit 1
               ;;
           esac

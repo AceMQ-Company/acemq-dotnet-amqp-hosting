@@ -11,6 +11,8 @@ one of the two had moved.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-26
+
 ### Added
 
 - **`AceMqConsumerRegistration.Idempotency`**, so a consumer registered with `AddConsumer` can

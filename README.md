@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/AceMQ-Company/acemq-dotnet-amqp-hosting/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/AceMQ-Company/acemq-dotnet-amqp-hosting/actions/workflows/ci.yml)
 [![authorship guard](https://github.com/AceMQ-Company/acemq-dotnet-amqp-hosting/actions/workflows/attribution-guard.yml/badge.svg?branch=main)](https://github.com/AceMQ-Company/acemq-dotnet-amqp-hosting/actions/workflows/attribution-guard.yml)
-[![version](https://img.shields.io/badge/version-0.1.0-blue)](https://github.com/AceMQ-Company/acemq-dotnet-amqp-hosting/releases)
+[![version](https://img.shields.io/badge/version-0.2.0-blue)](https://github.com/AceMQ-Company/acemq-dotnet-amqp-hosting/releases)
 [![packages](https://img.shields.io/badge/packages-acemq.org%2Fnuget-blue)](https://acemq.org/nuget/index.json)
 [![docs](https://img.shields.io/badge/docs-acemq.org-blue)](https://acemq.org/acemq-dotnet-amqp-hosting/)
 [![license](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
@@ -13,7 +13,7 @@ Dependency injection and hosted-service integration for
 declared topology, handlers resolved from the container, consumers that drain on shutdown,
 and a health check — configured from `appsettings.json` and nothing else.
 
-> **Status: `0.1.0`, the first release.** 52 unit tests over the library's in-memory
+> **Status: `0.2.0`, published.** 55 unit tests over the library's in-memory
 > transport and 6 integration tests against RabbitMQ 4, plus an example worker built and run
 > against a broker in CI. Built against the published `AceMq.Amqp` 0.7.2.
 

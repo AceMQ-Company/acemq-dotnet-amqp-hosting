@@ -13,7 +13,7 @@
     So: AceMq.Amqp is a dependency with a version range, not a sibling.
   -->
   <PropertyGroup>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
 
     <!-- The released AceMQ for .NET this is built and tested against. -->
     <AceMqVersion>0.7.2</AceMqVersion>

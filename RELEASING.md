@@ -206,13 +206,17 @@ affects `dotnet add package` or `dotnet restore`, which are all this package nee
 
 ## Credentials the release uses
 
-**Before a tag can be cut, this repository needs one secret it does not have:**
+**The secrets a release reads, and where each comes from:**
 
 | Secret | Needs | Required |
 | --- | --- | --- |
 | `NUGET_REPO_DEPLOY_KEY` | write access to `AceMQ-Company/nuget` | **yes — the release cannot publish without it** |
 | `SLACK_DELIVERY_WEBHOOK` | the delivery channel's incoming webhook | no |
 | `GITHUB_TOKEN` | this repository | built in, nothing to add |
+
+Both of the first two are set on this repository, and 0.2.0 was published with them. This
+paragraph used to say the deploy key was missing, which was true when it was written and
+stopped being true a few days later; `gh secret list` is the answer that cannot go stale.
 
 `NUGET_REPO_DEPLOY_KEY` is a **deploy key**, not a token. It writes to exactly one
 repository and nothing else — a scope a personal access token cannot express. It
