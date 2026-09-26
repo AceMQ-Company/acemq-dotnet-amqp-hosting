@@ -108,6 +108,17 @@ Anything registered with the library — `connection.RegisterHealth(contributor)
 `OrderedQueue`, which registers itself — is folded in, and the worst of them wins. Each
 appears as `check.{name}` in the data, with `Up`, `Degraded` or `Down` for a value.
 
+`IHealthContributor` is two members, `Name` and `Report()`, and `Report()` is **synchronous** —
+which is the awkward part, because most things worth reporting on are not. Worked examples of
+contributors for the things this package does not know about: an
+[outbox backlog](outbox.md#health-and-metrics) and a
+[stopped stream reader](streams.md#failure-and-skipfailures).
+
+Note that `AceMq.Amqp.HealthStatus` is not
+`Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus`. A contributor returns the
+library's; inside a namespace under `AceMq.Amqp` the enclosing namespace beats a file-level
+`using` alias, so write it out or declare the alias inside the namespace.
+
 The connection's own report is folded in with them, and its details are copied into the
 data as they are.
 

@@ -35,9 +35,14 @@ That is the whole surface for the common case.
 |---|---|
 | **Start here** | [Getting started](getting-started.md) |
 | **Reference** | [Configuration](configuration.md) — every setting under `acemq` |
-| **Usage** | [Handlers and consumers](handlers.md) · [Topology](topology.md) · [Publishing](publishing.md) · [Testing](testing.md) |
-| **Operations** | [Startup and shutdown](lifecycle.md) · [Health checks](health.md) · [Metrics and tracing](observability.md) |
+| **Usage** | [Handlers and consumers](handlers.md) · [Topology](topology.md) · [Publishing](publishing.md) · [Serialization and codecs](serialization.md) · [Testing](testing.md) |
+| **Patterns** | [Patterns from a host](patterns.md) — the map · [Retries and duplicates](retries.md) · [Request and reply](request-reply.md) · [Transactional outbox](outbox.md) · [Streams](streams.md) |
+| **Operations** | [Startup and shutdown](lifecycle.md) · [Health checks](health.md) · [Metrics and tracing](observability.md) · [Security](security.md) |
 | **Support** | [Enterprise support](https://acemq.com) · [Licence](licence.md) |
+
+If you are looking for a pattern the library has and cannot find a setting for it,
+[patterns from a host](patterns.md) is the page: it says where each one lives, which of them
+are configuration and which are a service you register, and why.
 
 ## What this is, and what it is not
 

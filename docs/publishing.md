@@ -50,6 +50,11 @@ awaiting a confirm at once, and `acemq:confirmTimeout` (30s) bounds how long eac
 Both are the back pressure that stops a producer outrunning a broker until the process runs
 out of memory.
 
+A broker that has *blocked* the connection is a different thing with a similar name, and it
+is not configuration at all — there is no event to subscribe to, and this package reports it
+through the health check instead. See
+[back pressure and a blocked broker](patterns.md#back-pressure-and-a-blocked-broker).
+
 ## Publishing at shutdown
 
 **A publish waiting for its confirm is not part of the drain.** Nothing waits for it, and a
@@ -61,7 +66,9 @@ The practical shape for a service that both publishes and consumes:
   reverse order, so it stops before the consumers drain, and the drain is not racing new
   publishes.
 - If a publish must survive a restart, it belongs in the library's outbox rather than in a
-  shutdown hook. `connection.Outbox(store)` is the entry point.
+  shutdown hook. `connection.Outbox(store)` is the entry point, and
+  [the outbox page](outbox.md) is the whole arrangement — including why an outbox is the one
+  publishing mechanism that does not care about shutdown ordering.
 
 ## Publishing from a handler
 

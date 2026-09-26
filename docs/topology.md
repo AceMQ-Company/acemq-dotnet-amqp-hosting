@@ -52,6 +52,9 @@ than quietly create the queue it was a typo for.
 deliberate: a classic queue on a cluster acknowledges a message that one node has, and that
 node can be the one that dies.
 
+`Stream` declares a stream, which is a log read rather than emptied and cannot be consumed by
+`AddConsumer` — see [streams](streams.md).
+
 `deadLetter: true` declares `{name}.dlq` alongside and points this queue's dead letters at
 it.
 
@@ -62,7 +65,8 @@ setting, and a JSON configuration file has only strings to offer.
 
 Every consumer also declares `{queue}.dlq` and `{queue}.parked` for itself, plus the rungs
 of its retry ladder when it has one — that is the library's behaviour, not this package's,
-and it happens whether or not the queue is declared here.
+and it happens whether or not the queue is declared here. See
+[retries and duplicates](retries.md#the-queues-this-declares).
 
 ## Bindings
 

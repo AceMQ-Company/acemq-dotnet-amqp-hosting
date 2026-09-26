@@ -192,9 +192,13 @@ footer { max-width:47rem; margin:0 auto; padding:1.5rem 1.25rem 4rem;
 }
 CSS
 
-# Six top-level entries with the rest grouped underneath, rather than twenty in a
-# row. Twenty was legible at 1600px and wrapped into three lines on a laptop, and a
-# navigation nobody can scan is one nobody uses.
+# A handful of top-level entries with the rest grouped underneath, rather than
+# eighteen in a row. Eighteen was legible at 1600px and wrapped into three lines on
+# a laptop, and a navigation nobody can scan is one nobody uses.
+#
+# Security is top level rather than inside Operations, because it is the page people
+# arrive looking for by name and a reader who has to open a menu to find it assumes
+# it is not there.
 #
 # The groups open on hover and on focus, so the keyboard reaches them too, and
 # every link is a plain anchor -- the menu needs no JavaScript and still works when
@@ -211,7 +215,19 @@ NAV='<nav class="top">
       <a href="handlers.html">Handlers and consumers</a>
       <a href="topology.html">Topology</a>
       <a href="publishing.html">Publishing</a>
+      <a href="serialization.html">Serialization and codecs</a>
       <a href="testing.html">Testing</a>
+    </div>
+  </div>
+
+  <div class="group">
+    <button type="button" aria-haspopup="true">Patterns</button>
+    <div class="menu">
+      <a href="patterns.html">Patterns from a host</a>
+      <a href="retries.html">Retries and duplicates</a>
+      <a href="request-reply.html">Request and reply</a>
+      <a href="outbox.html">Transactional outbox</a>
+      <a href="streams.html">Streams</a>
     </div>
   </div>
 
@@ -224,6 +240,8 @@ NAV='<nav class="top">
       <a href="licence.html">Licence</a>
     </div>
   </div>
+
+  <a class="api" href="security.html">Security</a>
 
   <a class="enterprise" href="https://acemq.org/acemq-dotnet-amqp/">The .NET library</a>
   <a class="enterprise" href="https://acemq.org/">JVM libraries</a>

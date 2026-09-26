@@ -114,10 +114,15 @@ deadline is what ends the process.
     r.Concurrency = 4;
     r.AutoStartup = false;
     r.Retry = new AceMqRetryOptions { Enabled = true, MaxAttempts = 5 };
+    r.RequeueOnFailure = false;
+    r.Idempotency = sp => sp.GetRequiredService<IIdempotencyStore>();
 })
 ```
 
-Anything left unset falls through to the [listener defaults](configuration.md#listener-defaults).
+Anything left unset falls through to the [listener defaults](configuration.md#listener-defaults)
+— except `Idempotency`, which has no listener default and no configuration key, because a
+store is a service rather than a scalar. [Retries and duplicates](retries.md) has the whole
+story, and it is the page to read next if a handler changes anything.
 
 ## Naming, and starting one by hand
 
@@ -140,4 +145,17 @@ nothing.
 
 Concurrency above one means messages from that queue are no longer handled in order. If
 order matters, leave it at one and scale by partitioning — the library's `Ordered` builder
-is the tool for that, and it is reachable from the injected `AceMqConnection`.
+is the tool for that, and it is reachable from the injected `AceMqConnection`. See
+[ordered queues](patterns.md#ordered-queues).
+
+## Consuming something that is not a queue
+
+`AddConsumer` consumes a queue, and two things that look like queues are not:
+
+- **A stream** needs an offset, and there is nowhere in `AddConsumer` to put one. See
+  [streams](streams.md).
+- **A request-reply queue** needs the handler's return value published back to the caller.
+  See [request and reply](request-reply.md).
+
+Both are a hosted service holding the library's own type, and both are on
+[patterns from a host](patterns.md).

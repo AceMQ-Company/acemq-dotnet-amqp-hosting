@@ -15,7 +15,7 @@ and a health check — configured from `appsettings.json` and nothing else.
 
 > **Status: `0.1.0`, the first release.** 52 unit tests over the library's in-memory
 > transport and 6 integration tests against RabbitMQ 4, plus an example worker built and run
-> against a broker in CI. Built against the published `AceMq.Amqp` 0.7.0.
+> against a broker in CI. Built against the published `AceMq.Amqp` 0.7.2.
 
 ```json
 {
@@ -67,6 +67,38 @@ Two packages:
 | `AceMq.Amqp.Hosting` | What an application adds: `AddAceMq`, the consumer host, the health check, and — because transports here are registered by hand rather than scanned for — the RabbitMQ transport |
 | `AceMq.Amqp.Hosting.OpenTelemetry` | `AddAceMqInstrumentation()` on the tracer and meter builders. Separate, so an application without OpenTelemetry does not carry it |
 
+### Versions
+
+| | version |
+|---|---|
+| `AceMq.Amqp.Hosting`, `AceMq.Amqp.Hosting.OpenTelemetry` | **0.1.0** |
+| `AceMq.Amqp`, `AceMq.Amqp.RabbitMq` this is built and tested against | **0.7.2** |
+| `Microsoft.Extensions.*` | 8.0.0, and see [requirements](#requirements) for why not the newest |
+
+The two AceMQ numbers are on separate lines on purpose, and one is not behind the other —
+see [its own version line](#its-own-version-line). The library comes down as a dependency,
+so an application names only the hosting package. `<AceMqVersion>` in
+`Directory.Build.props` is where the library version this repository pins actually lives;
+a CI job fails the build when it falls behind the newest release.
+
+**Pin an exact version while this package is `0.x`.** The public surface may change in any
+release, which is what semver means by leaving `0.y.z` outside its guarantees.
+
+```bash
+dotnet add package AceMq.Amqp.Hosting --version 0.1.0
+dotnet add package AceMq.Amqp.Hosting.OpenTelemetry --version 0.1.0   # if you use OpenTelemetry
+```
+
+```xml
+<PackageReference Include="AceMq.Amqp.Hosting" Version="0.1.0" />
+<PackageReference Include="AceMq.Amqp.Hosting.OpenTelemetry" Version="0.1.0" />
+```
+
+The nuspec asks for `AceMq.Amqp` 0.7.2 **or newer**, which is how NuGet reads a bare
+version, so an application already on a later library keeps it.
+
+### The feed
+
 AceMQ is not on nuget.org before 1.0:
 
 ```xml
@@ -106,23 +138,31 @@ Docker for the integration tests.
 - **A topology** — exchanges, queues and bindings, declared before any consumer starts.
   Nothing at all unless something is declared.
 - **Consumers** — one per `AddConsumer`, each a `ConsumerGroup`, started after the host is
-  built and drained when it stops.
+  built and drained when it stops. Prefetch, concurrency, a retry ladder and an
+  [idempotency store](docs/retries.md#handling-a-message-once) per consumer.
 - **A health check** — registered as `acemq`, tagged `ready`.
 - **Telemetry** — the library's `ActivitySource` and `Meter`, reachable in one line from an
   `AddOpenTelemetry()` application.
 
 ## Documentation
 
-Eleven pages at **<https://acemq.org/acemq-dotnet-amqp-hosting/>**. They read as markdown in
+Eighteen pages at **<https://acemq.org/acemq-dotnet-amqp-hosting/>**. They read as markdown in
 [docs/](docs/) too, and render with `.github/scripts/build-docs-site.sh`.
 
 | | |
 |---|---|
 | **Start here** | [docs/index.md](docs/index.md) · [Getting started](docs/getting-started.md) |
 | **Reference** | [Configuration](docs/configuration.md) — every setting under `acemq` |
-| **Usage** | [Handlers and consumers](docs/handlers.md) · [Topology](docs/topology.md) · [Publishing](docs/publishing.md) · [Testing](docs/testing.md) |
-| **Operations** | [Startup and shutdown](docs/lifecycle.md) · [Health checks](docs/health.md) · [Metrics and tracing](docs/observability.md) |
+| **Usage** | [Handlers and consumers](docs/handlers.md) · [Topology](docs/topology.md) · [Publishing](docs/publishing.md) · [Serialization and codecs](docs/serialization.md) · [Testing](docs/testing.md) |
+| **Patterns** | [Patterns from a host](docs/patterns.md) — the map · [Retries and duplicates](docs/retries.md) · [Request and reply](docs/request-reply.md) · [Transactional outbox](docs/outbox.md) · [Streams](docs/streams.md) |
+| **Operations** | [Startup and shutdown](docs/lifecycle.md) · [Health checks](docs/health.md) · [Metrics and tracing](docs/observability.md) · [Security](docs/security.md) |
 | **Support** | [Enterprise support](https://acemq.com) |
+
+**[Patterns from a host](docs/patterns.md)** is the page to read second. The library has an
+outbox, sagas, streams, request-reply, scheduling, pipelines, claim checks and replay, and
+most of them have no setting under `acemq` — because an outbox needs a database and a saga is
+three lambdas. That page says where each one lives, which of them are configuration and which
+are a service you register, and the one ordering rule that makes hand-wiring correct.
 
 ## Three decisions worth knowing about
 
@@ -208,6 +248,8 @@ Three honest limits follow from that table, and they are each expanded on the
   application that outgrows what is configurable here drops to the library without leaving
   anything behind — the connection it injects is the library's own, with the library's whole
   surface on it: outbox, sagas, streams, ordered queues, request-reply, interceptors.
+  [Patterns from a host](docs/patterns.md) shows each of those wired into a host, and says
+  plainly which ones have no setting and never will.
 - **No `appsettings.json` IntelliSense.** The Spring starter ships configuration metadata
   and properties complete as you type them. There is no equivalent here yet. XML
   documentation gives completion on the `AddAceMq(o => ...)` callback; the JSON file gets
@@ -220,7 +262,7 @@ Three honest limits follow from that table, and they are each expanded on the
 
 ## Its own version line
 
-0.1.0, while the library is at 0.7.0. This package tracks two release trains — AceMQ's and
+0.1.0, while the library is at 0.7.2. This package tracks two release trains — AceMQ's and
 Microsoft.Extensions' — and a change in either can force a release here. A shared version
 number could only say that one of the two had moved, which tells a consumer nothing about
 which. The Spring Boot starter is a separate repository on its own line for the same reason.

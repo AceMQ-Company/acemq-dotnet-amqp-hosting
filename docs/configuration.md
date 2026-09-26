@@ -35,9 +35,13 @@ and it is a difference from the Spring Boot starter worth knowing before copying
 | `confirmTimeout` | `00:00:30` | How long a publish waits for its confirm before it is a failure. |
 | `publisherConfirms` | `true` | Off, a `SendAsync` that returns has been written to a socket and accepted by nothing. |
 | `maxOutstandingPublishes` | `10000` | The back pressure that stops a producer outrunning a broker until the process runs out of memory. |
-| `format` | `json` | The codec, by name: `json`, `bytes`, `string`, `xml`, plus anything registered with `CodecRegistry.Register` before the host starts. |
+| `format` | `json` | The codec, by name: `json`, `bytes`, `string`, `xml`, plus anything registered with `CodecRegistry.Register` before the host starts — see [serialization](serialization.md). |
 
 ## TLS
+
+The table below is the reference. [Security](security.md) is the page that explains it,
+including what `amqps://` does to `mode`, where credentials should come from instead of this
+file, and development certificates.
 
 | Setting | Default | What it does |
 |---|---|---|
@@ -71,6 +75,10 @@ Every consumer takes these unless it overrides them.
 | `listener:shutdownTimeout` | `00:00:20` | How long shutdown waits for handlers still running. **Must be shorter than the host's own `ShutdownTimeout`** or the host stops waiting first; a warning is logged at startup when it is not. |
 | `listener:requeueOnFailure` | `false` | Requeue a message whose handler threw, rather than dead-lettering it. |
 
+There is no `listener:idempotency`. Deduplicating needs a store, which is a service rather
+than a scalar, so it is set per consumer — see
+[retries and duplicates](retries.md#handling-a-message-once).
+
 ## The retry ladder
 
 Off by default. A retry that is on by default is a retry nobody chose, and this ladder
@@ -95,7 +103,9 @@ it is the cheapest way to make a drain predictable.
 
 ## Topology
 
-See [topology](topology.md) for the shape and what each field means.
+See [topology](topology.md) for the shape and what each field means, and
+[streams](streams.md#declaring-one) for the one queue type whose arguments are broker
+durations rather than `TimeSpan`s.
 
 | Setting | Default |
 |---|---|
