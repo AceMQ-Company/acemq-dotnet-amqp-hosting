@@ -11,6 +11,115 @@ one of the two had moved.
 
 ## [Unreleased]
 
+### Added
+
+- **`AceMqConsumerRegistration.Idempotency`**, so a consumer registered with `AddConsumer` can
+  deduplicate. The library has had `ConsumerOptions.Idempotent(IIdempotencyStore)` since
+  before this package existed and this package silently dropped it: `AceMqConsumerHost` built
+  every consumer's options without it, so the only way to handle a message once was to stop
+  using `AddConsumer` and start a `ConsumerGroup` by hand.
+
+  ```csharp
+  .AddConsumer<Order, OrderHandler>("orders.new", configure: r =>
+      r.Idempotency = sp => sp.GetRequiredService<IIdempotencyStore>())
+  ```
+
+  It is a `Func<IServiceProvider, IIdempotencyStore>` rather than a store, because
+  `AddConsumer` runs while the container is still being built and a store worth having is a
+  service in it — the same database the handler writes to. The factory is called once, when
+  that consumer starts, which is the earliest point at which resolving one is correct. A store
+  you already have is `_ => store`.
+
+  Applied in `AceMqConsumerHost` rather than in `AceMqConnections.ConsumerOptionsFrom`, which
+  stays pure and takes no container.
+
+  There is no `acemq:listener:idempotency` and there will not be one. A store is a connection
+  string, a table name and a retention window at minimum, and naming one in
+  `appsettings.json` would mean this package opening database connections.
+
+### Documentation
+
+- **Seven new pages, and the reason for all of them is the same.** The library promotes
+  roughly twenty patterns and the documentation here covered the five that are configuration,
+  which left a reader with no answer at all for the other fifteen — not even "here is why this
+  one is not a setting".
+
+  - **[Patterns from a host](https://acemq.org/acemq-dotnet-amqp-hosting/patterns.html)** is
+    the map: every pattern the library has, against how it is reached from a host —
+    configuration, `AddConsumer`, or a service you register — and the ordering rule that makes
+    hand-wiring correct. That rule is the page's reason to exist: something a **handler calls**
+    is a lazily-initialised **singleton**, because container singletons are disposed after
+    every hosted service has stopped; something that **drives work** is an
+    **`IHostedService` registered after `AddAceMq`**, because those stop *before* the consumers
+    drain. Getting it the wrong way round produces an `ObjectDisposedException` on the last few
+    messages of every deployment and nothing reports it as an ordering problem.
+  - **[Security](https://acemq.org/acemq-dotnet-amqp-hosting/security.html)** — TLS and what
+    `amqps://` does to `tls:mode`, `serverName` as the legitimate alternative to `Insecure`,
+    where credentials should come from instead of `appsettings.json`, development certificates
+    and the `acemq-certs` tool, mutual TLS, and payload encryption with key rotation. Also
+    that **`ICredentialsProvider` is not reachable from this package** — `AceMqOptions` has no
+    setting for it and `AceMqConnections.ConfigFrom` only calls the
+    `Credentials(username, password)` overload — so credentials are read once, at connect, and
+    a rotation needs a restart or a hand-opened connection.
+  - **[Streams](https://acemq.org/acemq-dotnet-amqp-hosting/streams.html)** — declaring one in
+    `acemq:topology` with `type: "Stream"`, and reading one, which `AddConsumer` **cannot** do
+    because a reader takes an offset and a registration has nowhere to put one. The handler
+    returns `Task` and not `Task<Ack>`; nothing under `acemq:listener` reaches a reader; a
+    failing handler is retried every five seconds for ever unless `SkipFailures()` is on, in
+    which case the message is dead-lettered to `{stream}.dlq`; and nothing stores offsets, so
+    the application does.
+  - **[Retries and duplicates](https://acemq.org/acemq-dotnet-amqp-hosting/retries.html)** —
+    the ladder, the three queues a consumer declares whether or not you asked, why
+    `brokerWaitThreshold` is a shutdown setting, what each `Ack` means to the ladder, and
+    handling a message once with the new `r.Idempotency`. Including the sequence the store
+    sees, and that `ReleaseAsync` on failure is what stops a retry being mistaken for a
+    duplicate.
+  - **[Transactional outbox](https://acemq.org/acemq-dotnet-amqp-hosting/outbox.html)** — the
+    `DbOutboxStore.AddAsync(record, transaction)` overload the whole pattern turns on, a relay
+    as a `BackgroundService`, a health contributor on the backlog, and why the relay stopping
+    before the drain is *harmless* rather than the usual trap.
+  - **[Request and reply](https://acemq.org/acemq-dotnet-amqp-hosting/request-reply.html)** —
+    a `Requester` as a singleton because it declares a reply queue per instance, a `Responder`
+    as a hosted service, the three differences from `AddConsumer` that catch people, and why a
+    request made from a handler lengthens every drain.
+  - **[Serialization and codecs](https://acemq.org/acemq-dotnet-amqp-hosting/serialization.html)**
+    — `CodecRegistry` is static and global, so a codec of your own is registered in
+    `Program.cs` before `Build()` and cannot take a dependency from the container. Also that
+    **there is no per-consumer codec**: `ConsumerOptions.As(codec)` exists and this package
+    passes `codec: null`, so one connection means one codec, and a mixed queue means a
+    `CompositeCodec`.
+
+  Every code sample on the new pages is compiled against this package and the published
+  library before being written down, rather than being read off a signature.
+
+- The documented `AceMq.Amqp` version was **0.7.0** in the README's status line and version
+  section and in `RELEASING.md`, while `Directory.Build.props` has pinned **0.7.2** since the
+  library released it. The pin was never stale — `tracks-the-release` in CI fails the build for
+  that — but nothing checks the prose, so a library release leaves stale sentences here even
+  though no commit landed. `RELEASING.md` now says so, with the grep to run and the warning
+  that a historical "new in 0.7.0" is not a stale claim.
+- A **versions table** in the README, and `--version` on the `dotnet add package` lines, with
+  the reason: this package is `0.x`, so the surface may change in any release and a consumer
+  should pin.
+- `Security` is a top-level entry in the site navigation rather than one inside a menu, because
+  it is a page people arrive looking for by name and a reader who has to open a menu to find it
+  assumes it is not there. `Patterns` is a new menu beside `Guide` and `Operations`.
+
+### Known gaps
+
+Two that writing the pages above named for the first time. Both are things the library can do
+and this package cannot reach, and neither is fixed here:
+
+- **No per-consumer codec.** `ConsumerOptions.As(ICodec)` exists; `AceMqConsumerHost` builds
+  every consumer's options with `codec: null`, so every consumer decodes with the connection's
+  codec. An application reading two formats needs a `CompositeCodec`, `format: "bytes"` and a
+  decode in the handler, or a second connection.
+- **No reachable `ICredentialsProvider`.** Credentials are bound once and the connection is
+  opened once from them, so a password that rotates mid-process does not reach the connection.
+
+The three from 0.1.0 all still stand: no `appsettings.json` IntelliSense, a drain bounded by
+`concurrency` rather than `prefetch`, and no `acemq:blockedTimeout`.
+
 ## [0.1.0] - 2026-09-20
 
 The first release. Dependency injection and hosted-service integration for AceMQ AMQP:
