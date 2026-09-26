@@ -36,10 +36,16 @@ The source mapping is not decoration. Without it, an unauthenticated feed in the
 answer for any package id; with it, the AceMQ feed can only ever serve `AceMq.*`.
 
 ```bash
-dotnet add package AceMq.Amqp.Hosting
+dotnet add package AceMq.Amqp.Hosting --version 0.1.0
 ```
 
-That brings `AceMq.Amqp` and `AceMq.Amqp.RabbitMq` with it. The transport ships in the box
+The version is pinned because this package is `0.x`, and `0.y.z` is outside what semver
+promises: the configuration keys and the builder surface may change in any release. Pin
+until 1.0.
+
+That brings `AceMq.Amqp` 0.7.2 and `AceMq.Amqp.RabbitMq` 0.7.2 with it — the released
+library this version is built and tested against, and the minimum the nuspec asks for. An
+application already on a later library keeps it. The transport ships in the box
 on purpose — transports in this library are registered by hand rather than discovered by
 scanning, and a package that configures a connection from a URL and then cannot open one
 would be a poor trade for a saved dependency.

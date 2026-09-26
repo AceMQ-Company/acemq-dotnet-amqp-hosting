@@ -41,8 +41,9 @@ Spring Boot starter's changelog gives for the same arrangement, and the reasonin
 `Directory.Build.props` records at the top.
 
 So `AceMq.Amqp` is a **dependency with a version range**, not a sibling. The
-packed nuspec says `version="0.7.0"`, which NuGet reads as *0.7.0 or newer*, so a
-consumer already on a later library keeps it.
+packed nuspec says `version="0.7.2"` — whatever `<AceMqVersion>` holds — which
+NuGet reads as *0.7.2 or newer*, so a consumer already on a later library keeps
+it.
 
 While the version is `0.x` the public surface may change in any release, which is
 what semver means by leaving `0.y.z` outside its compatibility guarantees.
@@ -276,8 +277,24 @@ If it gains one, the job to copy is `landing-page` in
 `acemq-dotnet-amqp/.github/workflows/release.yml`.
 
 It also does not rewrite versions in the documentation. There is no
-`set-documented-version.sh` here, and the pages that name a version name the
-*library's* — `AceMq.Amqp` 0.7.0 — which a release of this package does not move.
+`set-documented-version.sh` here, and the pages that name a version mostly name
+the *library's* — `AceMq.Amqp` 0.7.2 — which a release of this package does not
+move.
+
+So a **library** release leaves stale sentences behind here even though no commit
+landed. `<AceMqVersion>` is checked by the `tracks-the-release` CI job and the
+README badge by `badge-matches-the-release`; the prose is not checked by
+anything. When `<AceMqVersion>` moves, grep for the old number and fix what it
+finds:
+
+```bash
+grep -rn "0\.7\.[0-9]" README.md RELEASING.md CHANGELOG.md docs/
+```
+
+Two kinds of hit come back and only one of them is stale. "Built against
+`AceMq.Amqp` 0.7.2" is a claim about the present and moves with the pin; "`held`
+is new in `AceMq.Amqp` 0.7.0" is a historical fact about when something appeared
+and must not be touched.
 
 ## Rules
 
