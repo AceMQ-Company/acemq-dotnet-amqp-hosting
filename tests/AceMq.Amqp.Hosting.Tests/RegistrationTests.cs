@@ -171,6 +171,45 @@ public class RegistrationTests
     }
 
     [Fact]
+    public void Nothing_deduplicates_unless_a_store_is_asked_for()
+    {
+        var provider = Services()
+            .AddAceMq()
+            .AddConsumer<Order, OrderHandler>("orders.new")
+            .Services.BuildServiceProvider();
+
+        var registration = Assert.Single(provider.GetServices<AceMqConsumerRegistration>());
+
+        Assert.Null(registration.Idempotency);
+    }
+
+    [Fact]
+    public void An_idempotency_store_is_resolved_from_the_container_and_not_at_registration()
+    {
+        // The factory is the whole point: AddConsumer runs while the container is still
+        // being built, so a store that is a service in it cannot be an argument here.
+        var resolutions = 0;
+        var store = new InMemoryIdempotencyStore(TimeSpan.FromMinutes(1));
+
+        var provider = Services()
+            .AddAceMq()
+            .AddConsumer<Order, OrderHandler>(
+                "orders.new",
+                configure: r => r.Idempotency = _ =>
+                {
+                    resolutions++;
+                    return store;
+                })
+            .Services.BuildServiceProvider();
+
+        var registration = Assert.Single(provider.GetServices<AceMqConsumerRegistration>());
+
+        Assert.NotNull(registration.Idempotency);
+        Assert.Equal(0, resolutions);
+        Assert.Same(store, registration.Idempotency!(provider));
+    }
+
+    [Fact]
     public void Several_consumers_accumulate()
     {
         var provider = Services()

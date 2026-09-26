@@ -85,6 +85,52 @@ public class HostLifecycleTests
     }
 
     [Fact]
+    public async Task A_consumer_with_an_idempotency_store_handles_the_same_message_once()
+    {
+        // The library keys on the envelope's id, so two publishes carrying one id are the
+        // duplicate this is about — which is what a redelivery looks like from here.
+        var store = new InMemoryIdempotencyStore(TimeSpan.FromMinutes(5));
+        var handled = 0;
+
+        using var host = Build(
+            nameof(A_consumer_with_an_idempotency_store_handles_the_same_message_once),
+            b => b.AddConsumer<Order>(
+                "orders.new",
+                (_, _) =>
+                {
+                    Interlocked.Increment(ref handled);
+                    return Task.FromResult(Ack.Accept());
+                },
+                configure: r => r.Idempotency = _ => store));
+
+        await host.StartAsync();
+
+        var connection = host.Services.GetRequiredService<AceMqConnection>();
+        var publisher = connection.Publisher<Order>("orders", "order.created");
+        var envelope = Envelope.Of("Order").Id("duplicated").Build();
+
+        await publisher.SendAsync(new Order("o-1"), envelope);
+        await publisher.SendAsync(new Order("o-1"), envelope);
+
+        // Both publishes were confirmed, so both messages reached the queue: the second is
+        // dropped at the claim rather than never arriving. Waiting for the claim to be
+        // confirmed is what makes this a test of behaviour rather than of a sleep, and the
+        // deadline is so that a store that never confirms fails the test instead of
+        // hanging the suite.
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        while (!await store.IsConfirmedAsync("duplicated"))
+        {
+            Assert.True(DateTime.UtcNow < deadline, "the first attempt was never confirmed");
+            await Task.Delay(10);
+        }
+
+        // The drain finishes the second delivery, whatever order the two arrived in.
+        await host.StopAsync();
+
+        Assert.Equal(1, handled);
+    }
+
+    [Fact]
     public async Task A_handler_is_resolved_from_a_scope_of_its_own_per_message()
     {
         using var host = Build(

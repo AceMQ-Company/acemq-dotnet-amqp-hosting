@@ -78,6 +78,27 @@ namespace AceMq.Amqp.Hosting
         /// <summary>The retry ladder for this consumer. Unset, the listener default.</summary>
         public AceMqRetryOptions? Retry { get; set; }
 
+        /// <summary>
+        /// The store that decides whether this message has been handled before. Unset,
+        /// nothing deduplicates and a redelivery is handled again.
+        /// </summary>
+        /// <remarks>
+        /// <para>A factory rather than a store, because <c>AddConsumer</c> runs while the
+        /// container is still being built and a store worth having is a service in it — the
+        /// same database the handler writes to, so that the claim and the work commit or
+        /// roll back together. The factory is called once per consumer, when the consumer
+        /// starts, with the application's root <see cref="IServiceProvider"/>.</para>
+        ///
+        /// <para>There is no configuration key for this and there will not be one. A store
+        /// is a connection string, a table name and a retention window at minimum, and
+        /// naming one in <c>appsettings.json</c> would mean this package building database
+        /// connections — which is the application's business and not a message library's.
+        /// </para>
+        ///
+        /// <para>A store that is already an object is written <c>_ => store</c>.</para>
+        /// </remarks>
+        public Func<IServiceProvider, IIdempotencyStore>? Idempotency { get; set; }
+
         /// <summary>The lifetime the handler is resolved with. Scoped unless changed.</summary>
         public ServiceLifetime HandlerLifetime { get; internal set; } = ServiceLifetime.Scoped;
 

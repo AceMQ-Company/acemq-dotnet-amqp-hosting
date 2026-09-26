@@ -170,6 +170,16 @@ namespace AceMq.Amqp.Hosting
             var options = _options.Value;
             var consumerOptions = AceMqConnections.ConsumerOptionsFrom(
                 options.Listener, registration, codec: null);
+
+            // Applied here rather than in ConsumerOptionsFrom, which is pure and takes no
+            // container. A store is resolved once per consumer at the moment it starts,
+            // which is after the application's services are built and is the earliest point
+            // at which resolving one is correct.
+            if (registration.Idempotency != null)
+            {
+                consumerOptions = consumerOptions.Idempotent(registration.Idempotency(_services));
+            }
+
             var concurrency = registration.Concurrency ?? options.Listener.Concurrency;
 
             IDisposable handle;
