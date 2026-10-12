@@ -15,7 +15,7 @@ and a health check — configured from `appsettings.json` and nothing else.
 
 > **Status: `0.2.1`, published.** 55 unit tests over the library's in-memory
 > transport and 6 integration tests against RabbitMQ 4, plus an example worker built and run
-> against a broker in CI. Built against the published `AceMq.Amqp` 0.7.10.
+> against a broker in CI. Built against the published `AceMq.Amqp` 0.7.11.
 
 ```json
 {
@@ -72,7 +72,7 @@ Two packages:
 | | version |
 |---|---|
 | `AceMq.Amqp.Hosting`, `AceMq.Amqp.Hosting.OpenTelemetry` | **0.2.1** |
-| `AceMq.Amqp`, `AceMq.Amqp.RabbitMq` this is built and tested against | **0.7.10** |
+| `AceMq.Amqp`, `AceMq.Amqp.RabbitMq` this is built and tested against | **0.7.11** |
 | `Microsoft.Extensions.*` | 8.0.0, and see [requirements](#requirements) for why not the newest |
 
 The two AceMQ numbers are on separate lines on purpose, and one is not behind the other —
@@ -94,7 +94,7 @@ dotnet add package AceMq.Amqp.Hosting.OpenTelemetry --version 0.2.1   # if you u
 <PackageReference Include="AceMq.Amqp.Hosting.OpenTelemetry" Version="0.2.1" />
 ```
 
-The nuspec asks for `AceMq.Amqp` 0.7.10 **or newer**, which is how NuGet reads a bare
+The nuspec asks for `AceMq.Amqp` 0.7.11 **or newer**, which is how NuGet reads a bare
 version, so an application already on a later library keeps it.
 
 ### The feed
@@ -262,7 +262,7 @@ Three honest limits follow from that table, and they are each expanded on the
 
 ## Its own version line
 
-0.2.1, while the library is at 0.7.10. This package tracks two release trains — AceMQ's and
+0.2.1, while the library is at 0.7.11. This package tracks two release trains — AceMQ's and
 Microsoft.Extensions' — and a change in either can force a release here. A shared version
 number could only say that one of the two had moved, which tells a consumer nothing about
 which. The Spring Boot starter is a separate repository on its own line for the same reason.

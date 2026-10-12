@@ -43,7 +43,7 @@ The version is pinned because this package is `0.x`, and `0.y.z` is outside what
 promises: the configuration keys and the builder surface may change in any release. Pin
 until 1.0.
 
-That brings `AceMq.Amqp` 0.7.10 and `AceMq.Amqp.RabbitMq` 0.7.10 with it — the released
+That brings `AceMq.Amqp` 0.7.11 and `AceMq.Amqp.RabbitMq` 0.7.11 with it — the released
 library this version is built and tested against, and the minimum the nuspec asks for. An
 application already on a later library keeps it. The transport ships in the box
 on purpose — transports in this library are registered by hand rather than discovered by

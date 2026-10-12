@@ -15,7 +15,7 @@ one of the two had moved.
 
 ### Changed
 
-- **Built against `AceMq.Amqp` 0.7.10**, from 0.7.2. The nuspec now asks for 0.7.10 or newer,
+- **Built against `AceMq.Amqp` 0.7.11**, from 0.7.2. The nuspec now asks for 0.7.11 or newer,
   so an application on this version gets the library fixes since 0.7.2 without naming the
   library itself. Nothing in this package's surface changed. What an application gains:
   - **Publishes the library makes on your behalf are confirmed and kept.** Retry hops,
@@ -28,6 +28,10 @@ one of the two had moved.
     rather than appending a second copy of it to the stream.
   - **A disposed consumer's channel is closed only after its running handler returns**, so a
     handler mid-flight no longer wedges the connection for every later declare.
+  - **A message whose handler was cancelled at shutdown comes back.** When the host's
+    shutdown wait runs out, the cancelled handler's message is requeued and the connection
+    closes at once; on 0.7.10 the message stayed unacknowledged and the connection stayed
+    open until the process exited.
   - **Shutdown is quicker and loses nothing.** `await using` and `CloseAsync()` drain;
     closing a consumer with a backlog takes milliseconds rather than thirty seconds; closing
     from inside a handler no longer hangs.
