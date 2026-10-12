@@ -50,6 +50,13 @@ awaiting a confirm at once, and `acemq:confirmTimeout` (30s) bounds how long eac
 Both are the back pressure that stops a producer outrunning a broker until the process runs
 out of memory.
 
+Turning them off with `acemq:publisherConfirms: false` changes only your own publishers.
+What the library publishes on your behalf — retry hops, moves to `{queue}.dlq` or
+`{queue}.parked`, the outbox relay, a replay, the scheduler, routing-slip and pipeline
+hops — is always confirmed, and a message that goes nowhere is kept rather than
+acknowledged away, whatever this setting says. Since `AceMq.Amqp` 0.7.10 the connection
+opens one extra channel in confirm mode for those publishes.
+
 A broker that has *blocked* the connection is a different thing with a similar name, and it
 is not configuration at all — there is no event to subscribe to, and this package reports it
 through the health check instead. See

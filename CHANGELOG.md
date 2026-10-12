@@ -11,6 +11,37 @@ one of the two had moved.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-12
+
+### Changed
+
+- **Built against `AceMq.Amqp` 0.7.10**, from 0.7.2. The nuspec now asks for 0.7.10 or newer,
+  so an application on this version gets the library fixes since 0.7.2 without naming the
+  library itself. Nothing in this package's surface changed. What an application gains:
+  - **Publishes the library makes on your behalf are confirmed and kept.** Retry hops,
+    moves to `{queue}.dlq` or `{queue}.parked`, the outbox relay, replay, the scheduler and
+    routing-slip or pipeline hops are confirmed even with `acemq:publisherConfirms: false`,
+    and a message that goes nowhere is kept rather than acknowledged away. Your own
+    publishers keep the mode you chose. See [publishing](docs/publishing.md).
+  - **Stream readers resume where they were after a reconnect**, instead of starting again
+    from their original offset; and a stream reader whose handler fails stops at that entry
+    rather than appending a second copy of it to the stream.
+  - **A disposed consumer's channel is closed only after its running handler returns**, so a
+    handler mid-flight no longer wedges the connection for every later declare.
+  - **Shutdown is quicker and loses nothing.** `await using` and `CloseAsync()` drain;
+    closing a consumer with a backlog takes milliseconds rather than thirty seconds; closing
+    from inside a handler no longer hangs.
+  - **Idempotency claims are leases.** A consumer killed mid-handler no longer blocks the
+    redelivery for the retention window, a redelivery whose claim is still held is put back
+    rather than acknowledged, and a failed claim insert in `DbIdempotencyStore` is no longer
+    read as a duplicate.
+  - **An outbox record the broker will never take stops being retried** after ten attempts,
+    and is kept for someone to read.
+  - **A stream declared from .NET spells `x-max-age` as `1h`**, as the other libraries do,
+    rather than `3600s`. A stream that already exists with `3600s` keeps it, and redeclaring
+    it with this version is refused; see the library's 0.7.10 changelog.
+  - `format: text` names the string codec, as Java and Python call it, beside `string`.
+
 ## [0.2.0] - 2026-09-26
 
 ### Added

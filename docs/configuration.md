@@ -33,9 +33,9 @@ and it is a difference from the Spring Boot starter worth knowing before copying
 | `clientName` | the application name | What the broker's management UI shows. "unnamed connection" on a page of forty is the same as no name at all. |
 | `connectionTimeout` | `00:00:10` | The TCP and protocol handshake. |
 | `confirmTimeout` | `00:00:30` | How long a publish waits for its confirm before it is a failure. |
-| `publisherConfirms` | `true` | Off, a `SendAsync` that returns has been written to a socket and accepted by nothing. |
+| `publisherConfirms` | `true` | Off, a `SendAsync` that returns has been written to a socket and accepted by nothing. Your publishers only: what the library publishes on your behalf is confirmed either way — see [publishing](publishing.md#confirms-and-back-pressure). |
 | `maxOutstandingPublishes` | `10000` | The back pressure that stops a producer outrunning a broker until the process runs out of memory. |
-| `format` | `json` | The codec, by name: `json`, `bytes`, `string`, `xml`, plus anything registered with `CodecRegistry.Register` before the host starts — see [serialization](serialization.md). |
+| `format` | `json` | The codec, by name: `json`, `bytes`, `string` (or `text`), `xml`, plus anything registered with `CodecRegistry.Register` before the host starts — see [serialization](serialization.md). |
 
 ## TLS
 
