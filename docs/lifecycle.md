@@ -166,6 +166,29 @@ being abandoned against a connection that is about to close. They come round aga
 the restart at the same attempt number, because the attempt counter travels on the message
 rather than in the process. One extra attempt, no lost message.
 
+## A handler that ignores the token
+
+Cancellation only works on a handler that listens for it. One that does not — a blocking
+call with no token, a loop that never checks — keeps running after the drain has given up
+on it. Since `AceMq.Amqp` 0.7.12 that handler can no longer hold shutdown hostage:
+
+1. The drain waits for running handlers up to `listener:shutdownTimeout`, as above.
+2. It then cancels the handlers' token.
+3. The library gives a handler still running **at most 5 more seconds**, then abandons it
+   and closes the connection.
+
+Closing the connection is what matters. The broker requeues the abandoned handler's
+unacknowledged message straight away, and another instance can take it. If the abandoned
+handler finishes later and acknowledges, that acknowledgement is ignored, so the message is
+never settled twice. Before 0.7.12 the shutdown waited for as long as the handler ran, and
+the connection and the message stayed held until the process exited.
+
+So the worst case for a stuck handler is the drain's timeout plus 5 seconds. Leave that much
+room under `HostOptions.ShutdownTimeout` — the 45-second host and 20-second drain above do.
+The abandoned handler's work is not rolled back: whatever it had done before the connection
+closed stays done, and the message comes round again, which is one more reason to make
+handlers [idempotent](handlers.md).
+
 ## Readiness
 
 The health check reports **unhealthy from the moment shutdown begins**, so an instance that

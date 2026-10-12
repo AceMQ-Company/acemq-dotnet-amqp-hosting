@@ -11,6 +11,22 @@ one of the two had moved.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-12
+
+### Changed
+
+- **Requires `AceMq.Amqp` 0.7.12**, from 0.7.11. The nuspec now asks for 0.7.12 or newer.
+  Nothing in this package's surface changed. What an application gains:
+  - **A handler that ignores the stopping token no longer holds the connection and its
+    message after shutdown.** The drain still waits for running handlers up to its timeout
+    and then cancels them, as before. If a handler carries on regardless, the library now
+    gives it at most 5 more seconds, then abandons it and closes the connection, so the
+    broker requeues the unacknowledged message at once. An acknowledgement the abandoned
+    handler sends later is ignored, so the message is never settled twice. On 0.7.11 the
+    host's shutdown waited for as long as such a handler ran, and the connection — and the
+    message — stayed held until the process exited. See [startup and
+    shutdown](docs/lifecycle.md#a-handler-that-ignores-the-token).
+
 ## [0.2.1] - 2026-10-12
 
 ### Changed

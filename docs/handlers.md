@@ -100,8 +100,9 @@ The token here stays uncancelled through a graceful drain and is cancelled only 
 drain has already overrun, which is the signal to stop and let the broker redeliver.
 
 Pass it to whatever you call. A handler that ignores it entirely still finishes on a
-graceful drain; it just cannot be stopped when the drain fails, and then the host's own
-deadline is what ends the process.
+graceful drain; it just cannot be stopped when the drain fails. The library then gives it at
+most 5 more seconds, abandons it and closes the connection, so its message goes back to the
+broker — see [a handler that ignores the token](lifecycle.md#a-handler-that-ignores-the-token).
 
 [Startup and shutdown](lifecycle.md) has the rest.
 
