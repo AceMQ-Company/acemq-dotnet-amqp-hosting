@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/AceMQ-Company/acemq-dotnet-amqp-hosting/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/AceMQ-Company/acemq-dotnet-amqp-hosting/actions/workflows/ci.yml)
 [![authorship guard](https://github.com/AceMQ-Company/acemq-dotnet-amqp-hosting/actions/workflows/attribution-guard.yml/badge.svg?branch=main)](https://github.com/AceMQ-Company/acemq-dotnet-amqp-hosting/actions/workflows/attribution-guard.yml)
-[![version](https://img.shields.io/badge/version-0.2.2-blue)](https://github.com/AceMQ-Company/acemq-dotnet-amqp-hosting/releases)
+[![version](https://img.shields.io/badge/version-0.2.3-blue)](https://github.com/AceMQ-Company/acemq-dotnet-amqp-hosting/releases)
 [![packages](https://img.shields.io/badge/packages-acemq.org%2Fnuget-blue)](https://acemq.org/nuget/index.json)
 [![docs](https://img.shields.io/badge/docs-acemq.org-blue)](https://acemq.org/acemq-dotnet-amqp-hosting/)
 [![license](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
@@ -13,9 +13,9 @@ Dependency injection and hosted-service integration for
 declared topology, handlers resolved from the container, consumers that drain on shutdown,
 and a health check — configured from `appsettings.json` and nothing else.
 
-> **Status: `0.2.2`, published.** 55 unit tests over the library's in-memory
+> **Status: `0.2.3`, published.** 55 unit tests over the library's in-memory
 > transport and 6 integration tests against RabbitMQ 4, plus an example worker built and run
-> against a broker in CI. Built against the published `AceMq.Amqp` 0.7.12.
+> against a broker in CI. Built against the published `AceMq.Amqp` 0.7.13.
 
 ```json
 {
@@ -71,8 +71,8 @@ Two packages:
 
 | | version |
 |---|---|
-| `AceMq.Amqp.Hosting`, `AceMq.Amqp.Hosting.OpenTelemetry` | **0.2.2** |
-| `AceMq.Amqp`, `AceMq.Amqp.RabbitMq` this is built and tested against | **0.7.12** |
+| `AceMq.Amqp.Hosting`, `AceMq.Amqp.Hosting.OpenTelemetry` | **0.2.3** |
+| `AceMq.Amqp`, `AceMq.Amqp.RabbitMq` this is built and tested against | **0.7.13** |
 | `Microsoft.Extensions.*` | 8.0.0, and see [requirements](#requirements) for why not the newest |
 
 The two AceMQ numbers are on separate lines on purpose, and one is not behind the other —
@@ -85,16 +85,16 @@ a CI job fails the build when it falls behind the newest release.
 release, which is what semver means by leaving `0.y.z` outside its guarantees.
 
 ```bash
-dotnet add package AceMq.Amqp.Hosting --version 0.2.2
-dotnet add package AceMq.Amqp.Hosting.OpenTelemetry --version 0.2.2   # if you use OpenTelemetry
+dotnet add package AceMq.Amqp.Hosting --version 0.2.3
+dotnet add package AceMq.Amqp.Hosting.OpenTelemetry --version 0.2.3   # if you use OpenTelemetry
 ```
 
 ```xml
-<PackageReference Include="AceMq.Amqp.Hosting" Version="0.2.2" />
-<PackageReference Include="AceMq.Amqp.Hosting.OpenTelemetry" Version="0.2.2" />
+<PackageReference Include="AceMq.Amqp.Hosting" Version="0.2.3" />
+<PackageReference Include="AceMq.Amqp.Hosting.OpenTelemetry" Version="0.2.3" />
 ```
 
-The nuspec asks for `AceMq.Amqp` 0.7.12 **or newer**, which is how NuGet reads a bare
+The nuspec asks for `AceMq.Amqp` 0.7.13 **or newer**, which is how NuGet reads a bare
 version, so an application already on a later library keeps it.
 
 ### The feed
@@ -262,7 +262,7 @@ Three honest limits follow from that table, and they are each expanded on the
 
 ## Its own version line
 
-0.2.2, while the library is at 0.7.12. This package tracks two release trains — AceMQ's and
+0.2.3, while the library is at 0.7.13. This package tracks two release trains — AceMQ's and
 Microsoft.Extensions' — and a change in either can force a release here. A shared version
 number could only say that one of the two had moved, which tells a consumer nothing about
 which. The Spring Boot starter is a separate repository on its own line for the same reason.

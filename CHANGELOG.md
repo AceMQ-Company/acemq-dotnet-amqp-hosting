@@ -11,6 +11,29 @@ one of the two had moved.
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-10-13
+
+### Changed
+
+- **Requires `AceMq.Amqp` 0.7.13**, from 0.7.12. The nuspec now asks for 0.7.13 or newer.
+  Nothing in this package's surface changed. What an application gains, and the one thing
+  it may have to change:
+  - **A responder that throws now tells the caller.** The failure travels back in the
+    `acemq-error` header and `RequestAsync` raises `ResponderFailedException`, with the
+    responder's text on `Failure`, at once instead of waiting out its timeout. The request
+    is dead-lettered to `{queue}.dlq` rather than retried. Catch it beside
+    `RequestTimedOutException`; [request and reply](docs/request-reply.md) shows both. A
+    requester still on 0.7.12 or older that asks a 0.7.13 responder gets an immediate
+    decode error instead of a timeout, so move both ends.
+  - **Breaking, for a type that implements `IMessage<T>` itself** — a hand-written test
+    double, say. `IMessage<T>` gains `Redelivered`, the broker's flag that a delivery was
+    requeued, and an implementation has to add it; returning `false` matches the old
+    behaviour. A handler that only receives an `IMessage<T>` is unaffected, and can now
+    read `message.Redelivered`. Nothing in this package implements `IMessage<T>`.
+  - **`ConnectionConfig.Builder.Origin`** names the `x-acemq-origin` a connection's
+    publishes carry when the envelope names none. Unset, it is `acemq@{host}` as before.
+  - **A publish under an empty routing key is typed `message`**, not the empty string.
+
 ## [0.2.2] - 2026-10-12
 
 ### Changed

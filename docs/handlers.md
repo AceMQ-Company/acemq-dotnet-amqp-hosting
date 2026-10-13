@@ -156,7 +156,8 @@ is the tool for that, and it is reachable from the injected `AceMqConnection`. S
 - **A stream** needs an offset, and there is nowhere in `AddConsumer` to put one. See
   [streams](streams.md).
 - **A request-reply queue** needs the handler's return value published back to the caller.
-  See [request and reply](request-reply.md).
+  See [request and reply](request-reply.md), which also covers the
+  `ResponderFailedException` a caller gets when the responder throws.
 
 Both are a hosted service holding the library's own type, and both are on
 [patterns from a host](patterns.md).

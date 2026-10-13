@@ -167,7 +167,7 @@ because nothing tells you a field was silently dropped.
 Avro makes it explicit, and `AceMq.Amqp.Avro` is a separate package:
 
 ```bash
-dotnet add package AceMq.Amqp.Avro --version 0.7.12
+dotnet add package AceMq.Amqp.Avro --version 0.7.13
 ```
 
 ```csharp

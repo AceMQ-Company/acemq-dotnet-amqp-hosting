@@ -93,8 +93,20 @@ app.MapPost("/quote", async (Basket basket, Pricing pricing, CancellationToken c
         // 504 rather than 500: nothing is broken here, the answer did not arrive in time.
         return Results.StatusCode(StatusCodes.Status504GatewayTimeout);
     }
+    catch (ResponderFailedException)
+    {
+        // 502: the answer did arrive, and it was that pricing could not do it.
+        return Results.StatusCode(StatusCodes.Status502BadGateway);
+    }
 });
 ```
+
+**A responder that throws answers with its failure** (`AceMq.Amqp` 0.7.13 and later). The
+reply carries the `acemq-error` header, valued `{ExceptionType}: {message}`, and
+`RequestAsync` raises `ResponderFailedException` at once, with that text on `Failure`, rather
+than waiting out the timeout. It is the header the Go, Python and Ruby responders use, so the
+same catch works whichever language answers. Only the text crosses the broker: a caller that
+has to tell failures apart needs that in the response type, not in the exception.
 
 `CancellationToken` in a minimal API handler is `HttpContext.RequestAborted`, so a client that
 gives up stops the wait rather than leaving it to time out. Pass it; the three-argument
@@ -172,8 +184,11 @@ Three differences from `AddConsumer`, all of them worth knowing:
 - **The handler takes the payload, not an `IMessage<T>`.** No envelope, no attempt number, no
   routing key. If the answer depends on any of those, this is the wrong tool and an ordinary
   consumer that publishes its own reply is the right one.
-- **There is no `Ack`.** Returning a value answers; throwing does not answer, and the request
-  times out at the caller. There is no dead letter and no retry ladder for a request.
+- **There is no `Ack`.** Returning a value answers. Throwing answers too, with the failure: the
+  caller gets `ResponderFailedException` at once, and the request is dead-lettered to
+  `{queue}.dlq` with the same reason rather than retried, because a retry would answer the
+  caller twice. There is no retry ladder for a request. (Before `AceMq.Amqp` 0.7.13 a throwing
+  handler sent nothing and the caller timed out.)
 - **No scope is created.** `AddConsumer` gives a handler a fresh `IServiceScope` per message;
   nothing does that here, so a responder touching scoped services makes its own. Without it a
   `DbContext` is shared across every request, which fails at the second concurrent one.
@@ -212,6 +227,7 @@ the ordering that makes this safe.
 ### Counters
 
 `Answered` and `Unanswerable` on the `Responder`, `IsRunning` for whether it still is.
+A request the handler failed is not counted in `Answered`.
 `Unanswerable` counts a request that arrived with no reply address — a message published to
 the same queue by something that was not a requester, which is usually a routing key bound
 twice by mistake.
@@ -238,7 +254,7 @@ Two instruments, both reaching an [OpenTelemetry](observability.md) pipeline wit
 | | |
 |---|---|
 | `acemq.request.duration` | round-trip time, tagged by target |
-| `acemq.request.total` | requests, tagged by outcome — `answered` or `timed_out` |
+| `acemq.request.total` | requests, tagged by outcome — `answered`, `timed_out` or `failed` |
 
 The ratio of those two outcomes is the health of the pair, and it is more useful than either
 side's own logs, because a timeout is the one failure both ends see differently.
@@ -262,4 +278,6 @@ Assert.Equal(42m, quote.Total);
 
 The test worth adding beside it is the timeout: no responder, a 200 ms deadline, and
 `Assert.ThrowsAsync<RequestTimedOutException>`. That path is the one an application actually
-has to handle, and it is the one nobody writes a test for.
+has to handle, and it is the one nobody writes a test for. The responder failing is the
+other: a handler that throws, and `Assert.ThrowsAsync<ResponderFailedException>` with no wait
+for the timeout.
