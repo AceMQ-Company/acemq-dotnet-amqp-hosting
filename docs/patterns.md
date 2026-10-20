@@ -310,7 +310,9 @@ they go back where they came from. `.KeepingAttempts()` leaves the attempt count
 which means a message that had exhausted its ladder exhausts it again immediately — that is
 occasionally what you want and usually not, so the default restarts the count.
 `ReplayAsync(max, filter)` takes a predicate over the raw delivery, for putting back only
-the ones that failed for the reason that has been fixed.
+the ones that failed for the reason that has been fixed. The ones it passes over stay on the
+source queue, in order, and are back on it before `ReplayAsync` returns, so a `PendingAsync()`
+straight after counts them (from `AceMq.Amqp` 0.7.14; before it, a quorum queue could read 0).
 
 **Bound it.** `ReplayAllAsync()` on a dead-letter queue holding a week of failures is a
 week of failures arriving at once, through a consumer sized for the ordinary rate. The

@@ -11,6 +11,15 @@ one of the two had moved.
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-10-20
+
+### Changed
+
+- **Requires `AceMq.Amqp` 0.7.14**, from 0.7.13. The nuspec now asks for 0.7.14 or newer.
+  Nothing in this package's surface changed. What an application gains: a filtered
+  `ReplayAsync` returns only once the messages it passed over are back on the source queue,
+  so a `PendingAsync()` straight after it no longer reads 0 on a quorum queue.
+
 ## [0.2.3] - 2026-10-13
 
 ### Changed

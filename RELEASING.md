@@ -29,7 +29,7 @@ and it is the reason 1.0 moves to nuget.org.
 
 ## Which number
 
-**This package versions independently of the library. It is at `0.2.3` while
+**This package versions independently of the library. It is at `0.2.4` while
 `AceMq.Amqp` is at `0.7.x`, and that is not drift.**
 
 It tracks two release trains, not one. A change in `Microsoft.Extensions.Hosting`
@@ -41,8 +41,8 @@ Spring Boot starter's changelog gives for the same arrangement, and the reasonin
 `Directory.Build.props` records at the top.
 
 So `AceMq.Amqp` is a **dependency with a version range**, not a sibling. The
-packed nuspec says `version="0.7.13"` — whatever `<AceMqVersion>` holds — which
-NuGet reads as *0.7.13 or newer*, so a consumer already on a later library keeps
+packed nuspec says `version="0.7.14"` — whatever `<AceMqVersion>` holds — which
+NuGet reads as *0.7.14 or newer*, so a consumer already on a later library keeps
 it.
 
 While the version is `0.x` the public surface may change in any release, which is
@@ -282,7 +282,7 @@ If it gains one, the job to copy is `landing-page` in
 
 It also does not rewrite versions in the documentation. There is no
 `set-documented-version.sh` here, and the pages that name a version mostly name
-the *library's* — `AceMq.Amqp` 0.7.13 — which a release of this package does not
+the *library's* — `AceMq.Amqp` 0.7.14 — which a release of this package does not
 move.
 
 So a **library** release leaves stale sentences behind here even though no commit
@@ -296,7 +296,7 @@ grep -rn "0\.7\.[0-9]" README.md RELEASING.md CHANGELOG.md docs/
 ```
 
 Two kinds of hit come back and only one of them is stale. "Built against
-`AceMq.Amqp` 0.7.13" is a claim about the present and moves with the pin; "`held`
+`AceMq.Amqp` 0.7.14" is a claim about the present and moves with the pin; "`held`
 is new in `AceMq.Amqp` 0.7.0" is a historical fact about when something appeared
 and must not be touched.
 
