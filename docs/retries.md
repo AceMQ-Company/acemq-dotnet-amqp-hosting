@@ -9,7 +9,13 @@ the [configuration page](configuration.md#the-retry-ladder). This page is what t
 
 ## Off by default
 
-A retry that is on by default is a retry nobody chose. Turning it on is one line:
+A retry that is on by default is a retry nobody chose. With the ladder off, a consumer makes
+**one attempt**: a handler that throws, or returns `Ack.Retry(reason)`, is dead-lettered to
+`{queue}.dlq` with `x-acemq-attempt` 1 and the reason on `x-acemq-error`. `Ack.Retry(after,
+reason)` still waits the delay it names. (Up to `AceMq.Amqp` 0.7.14 a failure with no ladder
+waited five seconds and went back on the queue, for ever.)
+
+Turning it on is one line:
 
 ```json
 {

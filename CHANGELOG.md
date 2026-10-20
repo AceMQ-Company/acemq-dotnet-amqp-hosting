@@ -11,6 +11,24 @@ one of the two had moved.
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-10-20
+
+### Changed
+
+- **Requires `AceMq.Amqp` 0.7.15**, from 0.7.14. The nuspec now asks for 0.7.15 or newer.
+  Nothing in this package's surface changed. What an application gains or must know:
+  - **A consumer with the retry ladder off makes one attempt.** A handler that throws, or
+    returns `Ack.Retry(reason)`, is dead-lettered to `{queue}.dlq` at once. Up to 0.7.14 it
+    waited five seconds and went back on the queue, for ever. Turn
+    `acemq:listener:retry` on for retries.
+  - **A pipeline hops through its own direct exchange**, named after the pipeline, with the
+    step name as routing key. A step queue redeclared by hand needs its binding back.
+  - **`acemq-replayed-at` carries milliseconds**, as `2026-02-03T04:05:06.789Z`.
+  - **`PublishFailedException.Unroutable` and `.Nacked`** tell an unroutable publish from a
+    broker `basic.nack`.
+- The streams page said a failing stream handler is retried every five seconds; the reader
+  stops at that entry, as it has since `AceMq.Amqp` 0.7.10. The page now says so.
+
 ## [0.2.4] - 2026-10-20
 
 ### Changed

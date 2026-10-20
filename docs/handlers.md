@@ -80,7 +80,7 @@ there for completeness.
 | | |
 |---|---|
 | `Ack.Accept()` | Done. Acknowledged. |
-| `Ack.Retry(reason)` or `Ack.Retry(after, reason)` | Try again, through the ladder if one is configured. |
+| `Ack.Retry(reason)` or `Ack.Retry(after, reason)` | Try again, through the ladder if one is configured. With no ladder, `Ack.Retry(reason)` dead-letters at once. |
 | `Ack.DeadLetter(reason)` | This message will fail the same way forever; file it. |
 | `Ack.Release()` | Not now; give it back to the broker for somebody else. |
 | `Ack.Park(reason)` | Set it aside for a human, separately from the dead letters. |

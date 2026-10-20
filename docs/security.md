@@ -236,8 +236,8 @@ It is on the AceMQ feed, and `dotnet tool install` cannot read that feed directl
 package is fetched first and installed from the current directory:
 
 ```bash
-curl -O https://acemq.org/nuget/v3/flatcontainer/acemq.amqp.devcerts/0.7.14/acemq.amqp.devcerts.0.7.14.nupkg
-dotnet tool install --global AceMq.Amqp.DevCerts --version 0.7.14 --source .
+curl -O https://acemq.org/nuget/v3/flatcontainer/acemq.amqp.devcerts/0.7.15/acemq.amqp.devcerts.0.7.15.nupkg
+dotnet tool install --global AceMq.Amqp.DevCerts --version 0.7.15 --source .
 acemq-certs --out certs --broker localhost
 ```
 

@@ -313,6 +313,8 @@ occasionally what you want and usually not, so the default restarts the count.
 the ones that failed for the reason that has been fixed. The ones it passes over stay on the
 source queue, in order, and are back on it before `ReplayAsync` returns, so a `PendingAsync()`
 straight after counts them (from `AceMq.Amqp` 0.7.14; before it, a quorum queue could read 0).
+A replayed message carries `acemq-replayed-at` in milliseconds with a `Z`, as in
+`2026-02-03T04:05:06.789Z` (whole seconds before `AceMq.Amqp` 0.7.15).
 
 **Bound it.** `ReplayAllAsync()` on a dead-letter queue holding a week of failures is a
 week of failures arriving at once, through a consumer sized for the ordinary rate. The
@@ -467,6 +469,13 @@ A step returning `null` ends the run early rather than failing it — `Pipeline<
 counts those. `ResumeAsync(payload, headers)` puts a message back **at the step named in
 its slip**, which is what makes a dead-lettered pipeline message recoverable;
 `Route.Of(message)` reads the slip off a message to find out where it was.
+
+A pipeline named `fulfilment` declares a direct exchange `fulfilment` and binds each
+`fulfilment.{step}` queue to it with the step's name; a step publishes the next hop to that
+exchange with the next step's name as the routing key, and the hop's `x-acemq-causation` is
+the id of the message the step handled. Up to `AceMq.Amqp` 0.7.14 a hop went to the default
+exchange by queue name, so a step queue deleted and redeclared by hand now also needs its
+binding back.
 
 Because a pipeline drives its own consumers, none of `acemq:listener` applies to it.
 Prefetch, retry and idempotency are on the builder, and they are the builder's own

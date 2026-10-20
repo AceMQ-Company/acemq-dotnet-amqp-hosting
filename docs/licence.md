@@ -8,7 +8,7 @@ You may use it in production, commercially, without asking and without paying.
 The licence disclaims warranties and limits liability — sections 7 and 8. In plain terms:
 this is provided as it is, and if it loses your messages that is your risk to have taken.
 
-That is not a formality to skim. This package is at 0.2.4, it sits on a pre-1.0 library, and
+That is not a formality to skim. This package is at 0.2.5, it sits on a pre-1.0 library, and
 its documentation says which parts have been proven against a real broker and which have
 not. [Startup and shutdown](lifecycle.md) is the page to read before deciding how much to
 rely on the drain, and it is deliberately specific about what a drain does *not* finish.

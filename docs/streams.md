@@ -211,17 +211,20 @@ rather than only at shutdown: a process killed rather than stopped never reaches
 
 ## Failure, and `SkipFailures`
 
-A handler that throws is **retried after five seconds**, indefinitely, and each attempt
-increments the reader's `Failed` counter. Five seconds is the reader's own fixed interval;
-`acemq:listener:retry` does not apply and there is no ladder.
+A handler that throws **stops the reader** at that entry. `IsActive` turns false, `Failed`
+counts it, and `AceMqDiagnostics.StreamReaderStopped` is reported with the offset. Nothing is
+retried and nothing is moved: republishing would append the entry to the log a second time,
+and every other reader would read it twice. `acemq:listener:retry` does not apply. The entry
+is still in the stream — fix the handler and start a reader from that offset. (Before
+`AceMq.Amqp` 0.7.10 the reader retried the entry every five seconds, for ever.)
 
 That is the safe default for a projection, because a message that cannot be applied must not
 be stepped over: message 400 applied before 399 produces a wrong answer that nobody notices.
-Retrying for ever is the conservative failure — the reader makes no progress past the bad
-message, `Failed` climbs, and somebody has to look. Which is the point.
+Stopping is the conservative failure — the reader makes no progress past the bad message, and
+somebody has to look. Which is the point.
 
-It is also a trap if you were expecting it to give up. **A permanently failing message stops
-a projection advancing, quietly, for as long as nobody is watching `Failed`.** Put it on a
+It is also a trap if you were expecting it to carry on. **A stopped reader stops a
+projection advancing, quietly, for as long as nobody is watching `IsActive`.** Put it on a
 dashboard, or take the other choice.
 
 `SkipFailures()` is the other choice: the failure is counted in `Skipped`, the message is

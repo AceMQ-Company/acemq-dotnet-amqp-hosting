@@ -45,6 +45,11 @@ protected override async Task ExecuteAsync(CancellationToken stoppingToken)
 
 ## Confirms and back pressure
 
+A publish that fails throws `PublishFailedException`. Its `Unroutable` flag is true when the
+broker returned a mandatory publish because nothing was bound to receive it, and `Nacked` is
+true for a broker `basic.nack`, so the two can be told apart without reading the message text
+(from `AceMq.Amqp` 0.7.15).
+
 On by default. `acemq:maxOutstandingPublishes` (10,000) bounds how many publishes can be
 awaiting a confirm at once, and `acemq:confirmTimeout` (30s) bounds how long each waits.
 Both are the back pressure that stops a producer outrunning a broker until the process runs
