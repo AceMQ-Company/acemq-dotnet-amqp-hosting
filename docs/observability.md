@@ -7,7 +7,7 @@ two names sees everything.
 ## OpenTelemetry
 
 ```bash
-dotnet add package AceMq.Amqp.Hosting.OpenTelemetry --version 0.2.6
+dotnet add package AceMq.Amqp.Hosting.OpenTelemetry --version 0.2.7
 ```
 
 ```csharp

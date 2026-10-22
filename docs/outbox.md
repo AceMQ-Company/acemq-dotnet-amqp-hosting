@@ -36,6 +36,15 @@ parameter prefix are the second and third arguments for a database whose placeho
 Console.WriteLine(new DbOutboxStore(supplier).CreateTableSql());
 ```
 
+**The record keeps the envelope's application headers**, and the relay publishes them. From
+`AceMq.Amqp` 0.7.17 the table has a nullable `headers` column for them; up to 0.7.16 they were
+dropped. A table made from an earlier `CreateTableSql()` keeps working without the headers, so
+add the column in a migration to keep them:
+
+```sql
+ALTER TABLE acemq_outbox ADD headers TEXT NULL;
+```
+
 `InMemoryOutboxStore` **is not an outbox**, and the library's own documentation says so. It
 shares the process's lifetime, so it cannot be written in the same transaction as anything
 durable and everything in it is lost on a restart — which is precisely the failure the pattern

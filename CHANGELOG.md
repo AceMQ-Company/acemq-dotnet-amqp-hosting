@@ -11,6 +11,19 @@ one of the two had moved.
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-10-22
+
+### Changed
+
+- **Requires `AceMq.Amqp` 0.7.17**, from 0.7.16. The nuspec now asks for 0.7.17 or newer.
+  Nothing in this package's surface changed. What an application gains or must know:
+  - **A pipeline hop carries every header it does not own** to the next step (application
+    headers, `traceparent`, unknown `x-acemq-` headers), and no longer writes
+    `x-acemq-first-seen: 0` for a message that had none. The patterns page says so.
+  - **The outbox keeps the envelope's application headers** and the relay publishes them. A
+    `DbOutboxStore` table from before 0.7.17 has no `headers` column and keeps working without
+    them; `ALTER TABLE acemq_outbox ADD headers TEXT NULL` keeps them. The outbox page says so.
+
 ## [0.2.6] - 2026-10-21
 
 ### Changed

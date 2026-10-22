@@ -482,6 +482,13 @@ is attempted once and dead-lettered to `{pipeline}.{step}.dlq` with every header
 with (from `AceMq.Amqp` 0.7.16; up to 0.7.15 it was retried every five seconds, for ever).
 `WithRetryDelay` is the opt-in to that; a policy, as in the example above, bounds it.
 
+A hop carries every header it does not own to the next step: application headers,
+`traceparent` and `x-acemq-` headers this version does not know. It writes its own envelope
+fields and the onward slip, and leaves behind `x-acemq-error` and `x-acemq-claim` of the
+delivery it handled. A message that arrived without `x-acemq-first-seen` leaves with the time
+it was read, not `0`. Both are from `AceMq.Amqp` 0.7.17; up to 0.7.16 a hop rebuilt the
+message from the envelope alone and the other headers were lost after the first step.
+
 Because a pipeline drives its own consumers, none of `acemq:listener` applies to it.
 Prefetch, retry and idempotency are on the builder, and they are the builder's own
 defaults, not this package's.
