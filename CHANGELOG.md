@@ -11,6 +11,18 @@ one of the two had moved.
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-10-21
+
+### Changed
+
+- **Requires `AceMq.Amqp` 0.7.16**, from 0.7.15. The nuspec now asks for 0.7.16 or newer.
+  Nothing in this package's surface changed. What an application gains or must know:
+  - **A pipeline step with no retry policy makes one attempt.** A step that throws, with no
+    `WithRetry(policy)` and no `WithRetryDelay(...)`, is dead-lettered to
+    `{pipeline}.{step}.dlq` with every header it arrived with. Up to 0.7.15 it was retried
+    every five seconds, for ever. `WithRetryDelay` is the opt-in to that. The patterns page
+    now says so.
+
 ## [0.2.5] - 2026-10-20
 
 ### Changed

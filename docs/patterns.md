@@ -477,6 +477,11 @@ the id of the message the step handled. Up to `AceMq.Amqp` 0.7.14 a hop went to 
 exchange by queue name, so a step queue deleted and redeclared by hand now also needs its
 binding back.
 
+A step that throws, with no `WithRetry(policy)` and no `WithRetryDelay(...)` on the builder,
+is attempted once and dead-lettered to `{pipeline}.{step}.dlq` with every header it arrived
+with (from `AceMq.Amqp` 0.7.16; up to 0.7.15 it was retried every five seconds, for ever).
+`WithRetryDelay` is the opt-in to that; a policy, as in the example above, bounds it.
+
 Because a pipeline drives its own consumers, none of `acemq:listener` applies to it.
 Prefetch, retry and idempotency are on the builder, and they are the builder's own
 defaults, not this package's.
