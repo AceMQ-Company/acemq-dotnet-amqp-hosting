@@ -489,6 +489,13 @@ delivery it handled. A message that arrived without `x-acemq-first-seen` leaves 
 it was read, not `0`. Both are from `AceMq.Amqp` 0.7.17; up to 0.7.16 a hop rebuilt the
 message from the envelope alone and the other headers were lost after the first step.
 
+Every hop keeps the run's `x-acemq-first-seen`, so `acemq.pipeline.run.duration` covers the
+whole run, from the first publish to the last step. A handler that forwards a routing slip
+itself should pass the delivery's wire headers,
+`mq.ForwardAsync(slip, message.Payload, message.Envelope, message.WireHeaders)`, so the
+`x-acemq-` headers this version does not know travel on as they do on a pipeline hop. That
+overload is from `AceMq.Amqp` 0.7.18; the three-argument `ForwardAsync` still drops them.
+
 Because a pipeline drives its own consumers, none of `acemq:listener` applies to it.
 Prefetch, retry and idempotency are on the builder, and they are the builder's own
 defaults, not this package's.

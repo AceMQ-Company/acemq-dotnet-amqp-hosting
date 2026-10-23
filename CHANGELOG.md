@@ -11,6 +11,17 @@ one of the two had moved.
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-10-22
+
+### Changed
+
+- **Requires `AceMq.Amqp` 0.7.18**, from 0.7.17. The nuspec now asks for 0.7.18 or newer.
+  Nothing in this package's surface changed. What an application gains:
+  - **A routing-slip forward can keep every header it does not own.** The new
+    `ForwardAsync(slip, payload, envelope, message.WireHeaders)` carries on the `x-acemq-`
+    headers this version does not know, as a pipeline hop does; the three-argument form is
+    unchanged and still drops them. The patterns page says so.
+
 ## [0.2.7] - 2026-10-22
 
 ### Changed
